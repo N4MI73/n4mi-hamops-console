@@ -1,0 +1,24 @@
+# --- Local settings and secrets: never commit ---
+config/settings.json
+*.local.json
+.env
+*.env
+
+# --- Data the console downloads or caches at run time ---
+server/data/
+*.cache.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# --- Editors and operating systems ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

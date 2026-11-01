@@ -1,0 +1,13 @@
+# Ham Ops Console kiosk -- runs once when labwc starts
+# 1. Landscape. If the picture is upside down, change 90 to 270 (section 6).
+wlr-randr --output DSI-2 --transform 90
+
+# 2. Chromium fullscreen, restarted automatically if it ever closes.
+KIOSK_URL="file:///home/hamops/kiosk-test.html"
+while true; do
+  chromium --kiosk --ozone-platform=wayland --noerrdialogs --disable-infobars \
+    --no-first-run --password-store=basic --disable-session-crashed-bubble \
+    --disable-features=Translate --check-for-update-interval=31536000 \
+    "$KIOSK_URL"
+  sleep 3
+done &

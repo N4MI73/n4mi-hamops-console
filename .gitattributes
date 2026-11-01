@@ -1,2 +1,7 @@
-# Auto detect text files and perform LF normalization
+# Normalise line endings in the repository.
 * text=auto
+# Files that run on the Pi must keep Unix line endings, even when checked out on Windows,
+# or the shell on the Pi will misread them.
+pi/** text eol=lf
+*.sh text eol=lf
+*.py text eol=lf

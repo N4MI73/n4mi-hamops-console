@@ -1,0 +1,35 @@
+{
+  "_comment": "Example only. The console reads its real settings from ~/.config/hamops-console/settings.json on the Pi (outside this repository). Copy this file there and fill in your own values. Never commit real addresses or contact details.",
+  "mode": "home",
+  "station": {
+    "home":  {"callsign": "N0CALL", "grid_source": "manual", "grid": "AA00"},
+    "field": {"callsign": "N0CALL", "grid_source": "manual", "grid": "AA00aa"}
+  },
+  "display": {
+    "night_style": "dim",
+    "day_brightness_pct": 80,
+    "night_brightness_pct": 20,
+    "night_start": "22:00",
+    "night_end": "07:00"
+  },
+  "sources": {
+    "propmon_url": "http://<propmon-host>:8076",
+    "sentinel_url": "http://<sentinel-host>:8085"
+  },
+  "thresholds": {
+    "propagation_stale_min": 30,
+    "nws_alerts_stale_min": 10,
+    "conditions_stale_min": 5,
+    "station_obs_stale_min": 90,
+    "forecast_stale_hours": 12,
+    "lightning_notify_mi": 10,
+    "lightning_high_mi": 5,
+    "lightning_hold_min": 30,
+    "lightning_frequent_per_min": 5,
+    "storms_forecast_hours": 6,
+    "prop_bad_k_index": 5,
+    "prop_bad_xray_classes": ["M", "X"],
+    "prop_good_min_bands": 2
+  },
+  "nws_user_agent_contact": "<your email or callsign contact>"
+}

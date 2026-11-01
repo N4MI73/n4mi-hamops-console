@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ham Ops Console kiosk test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0A0E13; color: #E6EBF0; font-family: sans-serif; overflow: hidden; touch-action: none; user-select: none; }
+  #info { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+  #info h1 { margin: 0 0 12px; font-size: 40px; }
+  #info p { margin: 6px 0; font-size: 24px; color: #A3B0BE; }
+  #size { font-size: 30px; color: #3FCF6E; font-weight: bold; }
+  .corner { position: absolute; width: 120px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; border: 2px solid #4DA3FF; border-radius: 10px; background: #11171F; pointer-events: none; }
+  .tl { top: 10px; left: 10px; } .tr { top: 10px; right: 10px; } .bl { bottom: 10px; left: 10px; } .br { bottom: 10px; right: 10px; }
+  #clear { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 220px; height: 64px; font-size: 24px; font-weight: bold; color: #fff; background: #1F5FAE; border: 0; border-radius: 10px; }
+  .dot { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: #F2B33D; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="corner tl">TOP LEFT</div>
+<div class="corner tr">TOP RIGHT</div>
+<div class="corner bl">BOTTOM LEFT</div>
+<div class="corner br">BOTTOM RIGHT</div>
+<div id="info">
+  <h1>Ham Ops Console kiosk test</h1>
+  <p id="size">measuring…</p>
+  <p>Touch anywhere: an amber dot should appear exactly under your finger.</p>
+  <p>Touch each corner box: its dot should land inside that box.</p>
+  <p id="last">No touches yet</p>
+</div>
+<button id="clear">Clear dots</button>
+<script>
+  function showSize() {
+    document.getElementById('size').textContent =
+      'Screen ' + window.innerWidth + ' × ' + window.innerHeight +
+      (window.innerWidth > window.innerHeight ? ' · landscape ✓' : ' · PORTRAIT (rotation wrong)');
+  }
+  showSize(); window.addEventListener('resize', showSize);
+  let count = 0;
+  function mark(x, y, how) {
+    const d = document.createElement('div'); d.className = 'dot';
+    d.style.left = x + 'px'; d.style.top = y + 'px'; document.body.appendChild(d);
+    count++;
+    document.getElementById('last').textContent = 'Touch ' + count + ' at ' + Math.round(x) + ', ' + Math.round(y) + ' (' + how + ')';
+  }
+  document.addEventListener('touchstart', function (e) {
+    if (e.target.id === 'clear') return;
+    e.preventDefault();
+    for (const t of e.changedTouches) mark(t.clientX, t.clientY, 'touch');
+  }, { passive: false });
+  document.addEventListener('mousedown', function (e) {
+    if (e.target.id === 'clear') return;
+    mark(e.clientX, e.clientY, 'mouse');
+  });
+  document.getElementById('clear').addEventListener('click', function () {
+    document.querySelectorAll('.dot').forEach(function (d) { d.remove(); });
+    count = 0; document.getElementById('last').textContent = 'No touches yet';
+  });
+</script>
+</body>
+</html>
