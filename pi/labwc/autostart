@@ -1,6 +1,7 @@
 # Ham Ops Console kiosk -- runs once when labwc starts
-# 1. Landscape. If the picture is upside down, change 90 to 270 (section 6).
-wlr-randr --output DSI-2 --transform 90
+# 1. Landscape. 270 is right for this build (confirmed 2026-11-01); if a different
+#    mount shows the picture upside down, use 90 instead.
+wlr-randr --output DSI-2 --transform 270
 
 # 2. Chromium fullscreen, restarted automatically if it ever closes.
 KIOSK_URL="file:///home/hamops/kiosk-test.html"

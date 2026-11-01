@@ -1,4 +1,4 @@
 <?xml version="1.0"?>
 <labwc_config>
-  <touch deviceName="Goodix Capacitive TouchScreen" mapToOutput="DSI-2" mouseEmulation="no"/>
+  <touch deviceName="11-005d Goodix Capacitive TouchScreen" mapToOutput="DSI-2" mouseEmulation="no"/>
 </labwc_config>
