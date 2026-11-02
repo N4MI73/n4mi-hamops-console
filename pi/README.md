@@ -5,7 +5,7 @@ Files that turn a fresh Raspberry Pi OS Lite install into the console's kiosk di
 | File here | Goes to (on the Pi) | Purpose |
 |---|---|---|
 | `labwc/rc.xml` | `~/.config/labwc/rc.xml` | Ties the touch panel (`11-005d Goodix Capacitive TouchScreen`, the name libinput reports) to the display (`DSI-2`) so touch follows the rotation |
-| `labwc/autostart` | `~/.config/labwc/autostart` | Rotates the display to landscape and runs Chromium fullscreen, restarting it if it closes |
+| `labwc/autostart` | `~/.config/labwc/autostart` | Rotates the display to landscape, waits for the console service, and runs Chromium fullscreen on it, restarting it if it closes |
 | `profile-kiosk.sh` | appended to `~/.profile` | Starts labwc on the Pi's own screen (tty1) only. SSH sessions are unaffected |
 | `systemd/hamops-console.service` | `/etc/systemd/system/hamops-console.service` | Runs the console service at boot and restarts it if it stops |
 
@@ -22,7 +22,7 @@ sudo raspi-config nonint do_boot_behaviour B2    # console autologin on the Pi's
 
 **Off switch:** `touch ~/kiosk.off` and reboot to get the plain text console instead of the kiosk; `rm ~/kiosk.off` and reboot to turn it back on.
 
-**Test page:** `diagnostics/kiosk-test.html` shows the screen size and orientation and drops a dot wherever you touch. `autostart` points at it until the console service is installed; then change the `KIOSK_URL` line to `http://127.0.0.1:8090/`.
+**Test page:** `diagnostics/kiosk-test.html` shows the screen size and orientation and drops a dot wherever you touch. `autostart` shows the console service (`http://127.0.0.1:8090/`); to show the test page instead, switch the `KIOSK_URL` line to the commented-out file line above it. At boot, `autostart` waits up to 60 seconds for the service before opening Chromium.
 
 ## Console service
 
@@ -38,4 +38,8 @@ systemctl status hamops-console          # should say active (running)
 curl -s http://127.0.0.1:8090/healthz    # {"status": "ok", ...}
 ```
 
+Then copy in the kiosk start-up file, which points Chromium at the service: `cp ~/hamops-console/pi/labwc/autostart ~/.config/labwc/autostart` and reboot.
+
 The unit file assumes the user `hamops` and the path above; edit both lines if yours differ. Logs: `journalctl -u hamops-console`.
+
+**Updating** after new commits: `cd ~/hamops-console && git pull && sudo systemctl restart hamops-console`. Don't edit files inside `~/hamops-console` on the Pi; `git pull` expects it unchanged. Settings stay in `~/.config/hamops-console/`.

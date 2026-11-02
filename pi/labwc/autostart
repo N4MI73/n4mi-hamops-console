@@ -3,8 +3,21 @@
 #    mount shows the picture upside down, use 90 instead.
 wlr-randr --output DSI-2 --transform 270
 
-# 2. Chromium fullscreen, restarted automatically if it ever closes.
-KIOSK_URL="file:///home/hamops/kiosk-test.html"
+# 2. What to show: the console service on this Pi. For the touch test page instead:
+#    KIOSK_URL="file:///home/hamops/kiosk-test.html"
+KIOSK_URL="http://127.0.0.1:8090/"
+
+# 3. At boot the service may still be starting. Wait for it (up to 60 s) so Chromium
+#    doesn't open on a "can't connect" page; after 60 s open anyway.
+case "$KIOSK_URL" in
+  http://127.0.0.1:*)
+    for i in $(seq 1 60); do
+      curl -sf -o /dev/null "${KIOSK_URL%/}/healthz" && break
+      sleep 1
+    done ;;
+esac
+
+# 4. Chromium fullscreen, restarted automatically if it ever closes.
 while true; do
   chromium --kiosk --ozone-platform=wayland --noerrdialogs --disable-infobars \
     --no-first-run --password-store=basic --disable-session-crashed-bubble \
