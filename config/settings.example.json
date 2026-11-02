@@ -16,7 +16,9 @@
     "propmon_url": "http://<propmon-host>:8076",
     "sentinel_url": "http://<sentinel-host>:8085"
   },
+  "server": {"host": "127.0.0.1", "port": 8090},
   "thresholds": {
+    "propagation_fetch_min": 5,
     "propagation_stale_min": 30,
     "nws_alerts_stale_min": 10,
     "conditions_stale_min": 5,

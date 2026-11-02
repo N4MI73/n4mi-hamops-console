@@ -7,7 +7,7 @@ A portable Raspberry Pi 5 touchscreen operations console for amateur radio. It p
 
 Both modes are the same dashboard reading the same JSON from a small service on the Pi; only that service's data sources change.
 
-> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the first piece of the console service.
+> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the first step of the console service (propagation relay and Pi status, with a plain check page).
 
 ## How it works
 
@@ -28,9 +28,9 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 
 | Folder | Contents |
 |---|---|
-| `server/` | The console service. So far: `hamops_console/nws_text.py` (short "what" and "hazard" lines from NWS alert text) and its tests |
-| `dashboard/` | The touchscreen web page (to come) |
-| `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium). See `pi/README.md` |
+| `server/` | The console service (Python + Flask). So far: propagation relay from PropMon, the Pi's own status, the shared freshness rule, NWS alert text lines, and tests. See `server/README.md` |
+| `dashboard/` | The touchscreen web page. For now a plain service check page; the real dashboard comes later |
+| `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium) and the service's systemd unit. See `pi/README.md` |
 | `config/` | `settings.example.json`, the template for the console's settings |
 | `diagnostics/` | Small standalone test tools, e.g. `kiosk-test.html` for checking screen rotation and touch |
 | `docs/` | Reference documents (the JSON contracts will go here) |
@@ -50,7 +50,7 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 
 - Raspberry Pi OS Lite (64-bit, Debian 13 "trixie")
 - labwc (Wayland compositor) + Chromium in kiosk mode
-- Console service: Python 3, run as a systemd service (being built)
+- Console service: Python 3 + Flask (from Raspberry Pi OS packages), run as a systemd service
 
 ## Configuration
 
@@ -58,10 +58,11 @@ The console reads its settings from `~/.config/hamops-console/settings.json` on 
 
 ## Running the tests
 
-No network, Pi or extra packages needed:
+No network or Pi needed. `test_service.py` needs Flask (`sudo apt install python3-flask`, or `pip install flask` elsewhere):
 
 ```
-python server/tests/test_nws_text.py
+python3 server/tests/test_nws_text.py
+python3 server/tests/test_service.py
 ```
 
 ## Credits
