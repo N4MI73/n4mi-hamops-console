@@ -39,8 +39,11 @@ DEFAULTS = {
     "thresholds": {
         "propagation_stale_min": 30,
         "propagation_fetch_min": 5,
+        "sentinel_fetch_min": 1,
         "nws_alerts_stale_min": 10,
+        "nws_alerts_unavailable_min": 30,
         "conditions_stale_min": 5,
+        "lightning_stale_min": 5,
         "station_obs_stale_min": 90,
         "forecast_stale_hours": 12,
         "lightning_notify_mi": 10,

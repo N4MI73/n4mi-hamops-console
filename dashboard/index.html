@@ -11,6 +11,7 @@
   main { box-sizing:border-box; height:100%; padding:16px; display:grid; grid-template-rows:auto 1fr auto; gap:12px; }
   h1 { margin:0; font-size:26px; } h1 span { font-size:18px; color:var(--muted); font-weight:normal; margin-left:12px; }
   .grid { display:grid; grid-template-columns:1.3fr 1fr; gap:12px; min-height:0; }
+  .col { display:grid; grid-template-rows:auto 1fr; gap:12px; min-height:0; }
   section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
   .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
   .head b { font-size:16px; letter-spacing:.1em; color:var(--muted); }
@@ -18,6 +19,9 @@
   .ok { color:var(--good); border-color:#2F8F52; } .stale { color:var(--fair); border-color:#8A6A22; }
   .unavailable, .test { color:var(--bad); border-color:#8C3631; }
   .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+  .wx { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .wx div span { display:block; font-size:15px; color:var(--muted); margin-bottom:4px; }
+  .wx div b { font-size:19px; font-weight:normal; }
   .nums div span { display:block; font-size:16px; color:var(--muted); } .nums div b { font-size:38px; }
   .bands { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
   .band { background:var(--bg); border-radius:8px; padding:8px 0; text-align:center; }
@@ -33,6 +37,7 @@
 <main>
   <h1>Ham Ops Console <span>service check page — Phase 1 · not the approved dashboard</span></h1>
   <div class="grid">
+    <div class="col">
     <section>
       <div class="head"><b>PROPAGATION</b><span id="p-status" class="status">…</span></div>
       <div class="nums">
@@ -42,6 +47,16 @@
       <div id="p-bands" class="bands"></div>
       <div id="p-msg" class="msg"></div>
     </section>
+    <section>
+      <div class="head"><b>WEATHER</b><span id="w-status" class="status">…</span></div>
+      <div class="wx">
+        <div><span>NWS alerts <em id="w-a-st"></em></span><b id="w-alerts">--</b></div>
+        <div><span>Conditions <em id="w-c-st"></em></span><b id="w-cond">--</b></div>
+        <div><span>Lightning <em id="w-l-st"></em></span><b id="w-light">--</b></div>
+      </div>
+      <div id="w-msg" class="msg"></div>
+    </section>
+    </div>
     <section>
       <div class="head"><b>SYSTEM</b><span id="s-status" class="status">…</span></div>
       <dl>
@@ -83,6 +98,25 @@ async function refresh() {
     document.getElementById("p-bands").innerHTML = (p.bands || []).map(b =>
       `<div class="band"><b>${b.band}</b><span class="${stale ? "none" : (b.rating || "none")}">${(b.rating || "--").toUpperCase()}</span></div>`).join("");
     document.getElementById("p-msg").textContent = p.message || "";
+
+    const w = await (await fetch("/api/weather", {cache: "no-store"})).json();
+    const wa = w.alerts, wc = w.conditions, wl = w.lightning;
+    setStatus("w-status", wa);
+    const tag = b => b ? (b.status === "ok" ? "" : "· " + statusText(b)[1]) : "";
+    document.getElementById("w-a-st").textContent = tag(wa);
+    document.getElementById("w-c-st").textContent = tag(wc);
+    document.getElementById("w-l-st").textContent = tag(wl);
+    document.getElementById("w-alerts").textContent =
+      wa.status === "unavailable" ? "UNAVAILABLE — not the same as no alerts" :
+      wa.status === "test" ? "Station in test mode" :
+      wa.items.length ? wa.items.map(i => i.event).join(", ") : "None in effect";
+    document.getElementById("w-cond").textContent = wc.status === "unavailable" ? "--" :
+      `${dash(wc.temperature_f)} °F · ${dash(wc.humidity_pct)} % · ${dash(wc.wind_dir)} ${dash(wc.wind_mph)} mph`;
+    document.getElementById("w-light").textContent = !wl ? "--" :
+      wl.within_5mi ? `WITHIN 5 MI (${dash(wl.closest_mi)} mi)` : wl.within_10mi ? `Within 10 mi (${dash(wl.closest_mi)} mi)` :
+      wl.within_10mi === false ? `None close · ${dash(wl.strikes_recent)} in ${dash(wl.window_min)} min` : "--";
+    document.getElementById("w-msg").textContent = [wa, wc, wl].filter(b => b && b.message).map(b => b.message)
+      .filter((m, i, all) => all.indexOf(m) === i).join(" · ");
 
     const s = (await (await fetch("/api/system", {cache: "no-store"})).json()).system;
     setStatus("s-status", s);

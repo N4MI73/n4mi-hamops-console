@@ -42,7 +42,8 @@ def parse_time(value):
     return dt
 
 
-def block(source, fetched_at, issued_at, stale_after_sec, error=None, now=None, test=False):
+def block(source, fetched_at, issued_at, stale_after_sec, error=None, now=None, test=False,
+          force_stale=False, unavailable_after_sec=None):
     """Build the freshness fields for one data block.
 
     source           short name shown to the user, e.g. "PropMon"
@@ -51,13 +52,20 @@ def block(source, fetched_at, issued_at, stale_after_sec, error=None, now=None, 
     stale_after_sec  age beyond which the data counts as stale
     error            short reason the last attempt failed, or None
     test             True while the source is in a test/simulation mode
+    force_stale      True when the source itself says its data isn't current
+                     (e.g. Weather Sentinel's `available: false`)
+    unavailable_after_sec
+                     age beyond which old data is no longer shown at all
+                     (NWS alerts: 30 min), or None for never
 
-    Rules:
-      - never had good data            -> unavailable
-      - source in test mode            -> test
-      - data older than the threshold  -> stale (last good data still shown)
-      - otherwise                      -> ok
+    Rules, in order:
+      - never had good data                     -> unavailable
+      - older than unavailable_after_sec        -> unavailable
+      - source in test mode                     -> test
+      - older than the threshold, or forced     -> stale (last good data still shown)
+      - otherwise                               -> ok
     Age is measured from issued_at when the source gives one, else fetched_at.
+    The caller must not show a block's data when its status is unavailable.
     """
     now = now or utcnow()
     if fetched_at is None:
@@ -68,8 +76,13 @@ def block(source, fetched_at, issued_at, stale_after_sec, error=None, now=None, 
         }
     reference = issued_at or fetched_at
     age = max(0, int((now - reference).total_seconds()))
-    if test:
+    if unavailable_after_sec is not None and age > unavailable_after_sec:
+        status = UNAVAILABLE
+        message = error or f"No current data from {source} for {age // 60} min"
+    elif test:
         status, message = TEST, f"{source} is in test mode"
+    elif force_stale:
+        status, message = STALE, error or f"{source} says its data isn't current"
     elif age > stale_after_sec:
         status = STALE
         minutes = age // 60

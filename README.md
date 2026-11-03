@@ -7,7 +7,7 @@ A portable Raspberry Pi 5 touchscreen operations console for amateur radio. It p
 
 Both modes are the same dashboard reading the same JSON from a small service on the Pi; only that service's data sources change.
 
-> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the first step of the console service (propagation relay and Pi status, with a plain check page).
+> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the first steps of the console service (propagation relay, home weather relay and Pi status, with a plain check page).
 
 ## How it works
 
@@ -28,7 +28,7 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 
 | Folder | Contents |
 |---|---|
-| `server/` | The console service (Python + Flask). So far: propagation relay from PropMon, the Pi's own status, the shared freshness rule, NWS alert text lines, and tests. See `server/README.md` |
+| `server/` | The console service (Python + Flask). So far: propagation relay from PropMon, home weather relay from Weather Sentinel, the Pi's own status, the shared freshness rule, alert classification, NWS alert text lines, and tests. See `server/README.md` |
 | `dashboard/` | The touchscreen web page. For now a plain service check page; the real dashboard comes later |
 | `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium) and the service's systemd unit. See `pi/README.md` |
 | `config/` | `settings.example.json`, the template for the console's settings |
@@ -58,11 +58,12 @@ The console reads its settings from `~/.config/hamops-console/settings.json` on 
 
 ## Running the tests
 
-No network or Pi needed. `test_service.py` needs Flask (`sudo apt install python3-flask`, or `pip install flask` elsewhere):
+No network or Pi needed. `test_service.py` and `test_weather.py` need Flask (`sudo apt install python3-flask`, or `pip install flask` elsewhere):
 
 ```
 python3 server/tests/test_nws_text.py
 python3 server/tests/test_service.py
+python3 server/tests/test_weather.py
 ```
 
 ## Credits

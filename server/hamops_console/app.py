@@ -1,7 +1,7 @@
 """The console service: serves the dashboard page and the JSON API.
 
-Phase 1, first step (2026-11-02): GET /, /api/propagation and /api/system.
-Weather, alerts and settings endpoints follow in later steps.
+Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather and /api/system.
+Alerts ranking and settings endpoints follow in later steps.
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -14,14 +14,16 @@ from flask import Flask, jsonify, send_from_directory
 
 from . import __version__, freshness, settings as settings_mod, system_info
 from .propagation import PropagationSource
+from .weather import WeatherSource
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_DIR = REPO_ROOT / "dashboard"
 
 
-def create_app(settings=None, propagation=None, dashboard_dir=DASHBOARD_DIR):
+def create_app(settings=None, propagation=None, weather=None, dashboard_dir=DASHBOARD_DIR):
     settings = settings or settings_mod.load()
     propagation = propagation or PropagationSource(settings)
+    weather = weather or WeatherSource(settings)
     started_at = freshness.utcnow()
     app = Flask(__name__, static_folder=None)
 
@@ -43,6 +45,10 @@ def create_app(settings=None, propagation=None, dashboard_dir=DASHBOARD_DIR):
     @app.get("/api/propagation")
     def api_propagation():
         return envelope(propagation=propagation.block())
+
+    @app.get("/api/weather")
+    def api_weather():
+        return envelope(**weather.blocks())
 
     @app.get("/api/system")
     def api_system():
