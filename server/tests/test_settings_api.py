@@ -169,7 +169,7 @@ class Connections(unittest.TestCase):
         self.assertEqual([r["source"] for r in results], ["PropMon", "Weather Sentinel", "NWS"])
         self.assertEqual(seen[0][1], "http://propmon.example:8076/api/instrument/propagation")
         self.assertEqual(seen[1][1], "http://other.example:8085/api/conditions")   # unsaved address
-        self.assertEqual(seen[2][1], "https://api.weather.gov/")
+        self.assertEqual(seen[2][1], "https://api.weather.gov/alerts/active/count")
         self.assertTrue(seen[2][2].endswith("(n0call@example.com)"))
 
     def test_not_set_and_invalid(self):

@@ -289,8 +289,10 @@ def test_connections(settings, sources=None, fetch=_try, timeout=5):
     json_headers = {"Accept": "application/json", "User-Agent": "HamOpsConsole"}
     plan = [("PropMon", use.get("propmon_url"), "/api/instrument/propagation", json_headers),
             ("Weather Sentinel", use.get("sentinel_url"), "/api/conditions", json_headers),
-            ("NWS", forecast.API, "/", {"Accept": "application/geo+json",
-                                        "User-Agent": forecast.user_agent(contact)})]
+            # NWS's home page is HTML, not JSON (found on the Pi, 2026-11-03), so test a
+            # small JSON endpoint instead: the national count of active alerts.
+            ("NWS", forecast.API, "/alerts/active/count", {"Accept": "application/geo+json",
+                                                         "User-Agent": forecast.user_agent(contact)})]
     results = []
     for name, base, path, headers in plan:
         if not base:
