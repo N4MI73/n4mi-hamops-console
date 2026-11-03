@@ -133,7 +133,7 @@ EMPTY_CONDITIONS = translate_conditions({})
 EMPTY_LIGHTNING = {
     "within_10mi": None, "within_5mi": None, "frequent": None, "closest_mi": None,
     "last_strike_at": None, "strikes_recent": None, "window_min": None,
-    "hold_until_10mi": None, "hold_until_5mi": None,
+    "hold_until_10mi": None, "hold_until_5mi": None, "hold_since_5mi": None,
 }
 
 
@@ -163,6 +163,7 @@ class WeatherSource:
         self._attempted_at = None
         self._error = None
         self._hold_5mi_until = None  # the console's own 5-mile lightning hold
+        self._hold_5mi_since = None  # when the current hold began (stable id for Acknowledge)
 
     # -- settings
     def _t(self, key):
@@ -216,6 +217,8 @@ class WeatherSource:
             strike_time = now
         if strike_time is not None:
             until = strike_time + hold
+            if self._hold_5mi_until is None or strike_time >= self._hold_5mi_until:
+                self._hold_5mi_since = strike_time   # a new hold, not an extension
             if self._hold_5mi_until is None or until > self._hold_5mi_until:
                 self._hold_5mi_until = until
 
@@ -297,6 +300,9 @@ class WeatherSource:
             "frequent": None if per_minute is None else per_minute > self._t("lightning_frequent_per_min"),
             "hold_until_10mi": freshness.iso(hold_10),
             "hold_until_5mi": freshness.iso(self._hold_5mi_until) if within_5 else None,
+            # Extra field (not in contracts 0.3): when this 5-mile hold began, so the
+            # alert list can flash once per hold and key Acknowledge on it.
+            "hold_since_5mi": freshness.iso(self._hold_5mi_since) if within_5 else None,
         })
         return out
 

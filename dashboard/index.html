@@ -20,6 +20,13 @@
   .unavailable, .test { color:var(--bad); border-color:#8C3631; }
   .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
   .wx { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .al { list-style:none; margin:0; padding:0; display:grid; gap:6px; font-size:15px; }
+  .al li { display:flex; gap:10px; align-items:baseline; background:var(--bg); border-radius:8px; padding:6px 10px; border-left:6px solid var(--poor); }
+  .al li.red { border-color:var(--bad); } .al li.yellow { border-color:var(--fair); }
+  .al li.green { border-color:var(--good); } .al li.blue { border-color:#4A90E2; }
+  .al li b { white-space:nowrap; } .al li span { color:var(--muted); flex:1; }
+  .al li em { color:var(--muted); font-size:14px; white-space:nowrap; }
+  .al button { font-size:16px; padding:6px 10px; border-radius:6px; border:1px solid var(--bad); background:#2A1210; color:var(--ink); }
   .fc { margin-top:12px; font-size:19px; } .fc span { font-size:15px; color:var(--muted); }
   .wx div span { display:block; font-size:15px; color:var(--muted); margin-bottom:4px; }
   .wx div b { font-size:19px; font-weight:normal; }
@@ -59,6 +66,11 @@
       <div id="w-msg" class="msg"></div>
     </section>
     </div>
+    <div class="col">
+    <section>
+      <div class="head"><b>ALERTS</b><span class="status">ranked by the service</span></div>
+      <ul id="alerts" class="al"></ul>
+    </section>
     <section>
       <div class="head"><b>SYSTEM</b><span id="s-status" class="status">…</span></div>
       <dl>
@@ -72,6 +84,7 @@
         <dt>Service</dt><dd id="s-svc">--</dd>
       </dl>
     </section>
+    </div>
   </div>
   <footer id="foot">Waiting for the console service…</footer>
 </main>
@@ -126,6 +139,14 @@ async function refresh() {
     document.getElementById("w-msg").textContent = [wa, wc, wl, wf].filter(b => b && b.message).map(b => b.message)
       .filter((m, i, all) => all.indexOf(m) === i).join(" · ");
 
+    const esc = t => String(t ?? "").replace(/[&<>"]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[ch]));
+    const items = (await (await fetch("/api/alerts", {cache: "no-store"})).json()).items;
+    document.getElementById("alerts").innerHTML = items.slice(0, 3).map(i =>
+      `<li class="${i.color}"><b>${esc(i.title)}</b><span>${esc(i.detail)}</span>` +
+      (i.critical && !i.acknowledged ? `<button data-id="${esc(i.ref.id)}">Acknowledge</button>` : "") +
+      `<em>${i.tier === "badge" ? "badge" : i.critical ? (i.acknowledged ? "critical · ack'd" : "CRITICAL") : ""}</em></li>`).join("") +
+      (items.length > 3 ? `<li><span>+ ${items.length - 3} more</span></li>` : "");
+
     const s = (await (await fetch("/api/system", {cache: "no-store"})).json()).system;
     setStatus("s-status", s);
     document.getElementById("s-cpu").textContent = `${dash(s.cpu_temp_c)} °C · load ${dash(s.cpu_load_pct)} %`;
@@ -147,6 +168,13 @@ async function refresh() {
     document.getElementById("foot").textContent = "Console service not answering (" + e.message + ")";
   }
 }
+document.getElementById("alerts").addEventListener("click", async e => {
+  const id = e.target.dataset && e.target.dataset.id;
+  if (!id) return;
+  e.target.disabled = true;
+  await fetch("/api/alerts/ack", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({id})});
+  refresh();
+});
 refresh(); setInterval(refresh, 15000);
 </script>
 </body>
