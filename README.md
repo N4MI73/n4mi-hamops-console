@@ -7,7 +7,7 @@ A portable Raspberry Pi 5 touchscreen operations console for amateur radio. It p
 
 Both modes are the same dashboard reading the same JSON from a small service on the Pi; only that service's data sources change.
 
-> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the first steps of the console service (propagation relay, home weather relay, NWS forecast, alert ranking and Pi status, with a plain check page).
+> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the first steps of the console service (propagation relay, home weather relay, NWS forecast, alert ranking, the settings API and Pi status, with a plain check page).
 
 ## How it works
 
@@ -28,7 +28,7 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 
 | Folder | Contents |
 |---|---|
-| `server/` | The console service (Python + Flask). So far: propagation relay from PropMon, home weather relay from Weather Sentinel, the NWS forecast, the ranked alert list, the Pi's own status, the shared freshness rule, alert classification, NWS alert text lines, and tests. See `server/README.md` |
+| `server/` | The console service (Python + Flask). So far: propagation relay from PropMon, home weather relay from Weather Sentinel, the NWS forecast, the ranked alert list, the settings API, the Pi's own status, the shared freshness rule, alert classification, NWS alert text lines, and tests. See `server/README.md` |
 | `dashboard/` | The touchscreen web page. For now a plain service check page; the real dashboard comes later |
 | `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium) and the service's systemd unit. See `pi/README.md` |
 | `config/` | `settings.example.json`, the template for the console's settings |
@@ -66,6 +66,7 @@ python3 server/tests/test_service.py
 python3 server/tests/test_weather.py
 python3 server/tests/test_forecast.py
 python3 server/tests/test_alerts.py
+python3 server/tests/test_settings_api.py
 ```
 
 ## Credits

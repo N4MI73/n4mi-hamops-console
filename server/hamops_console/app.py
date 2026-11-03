@@ -1,7 +1,8 @@
 """The console service: serves the dashboard page and the JSON API.
 
 Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather, /api/alerts,
-/api/system and POST /api/alerts/ack. The settings endpoints follow.
+/api/system, POST /api/alerts/ack, and GET/PUT /api/settings with
+POST /api/settings/test.
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from . import __version__, alerts as alerts_mod, freshness, settings as settings_mod, system_info
+from . import __version__, alerts as alerts_mod, freshness, settings as settings_mod, settings_api, system_info
 from .propagation import PropagationSource
 from .weather import WeatherSource
 
@@ -20,8 +21,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_DIR = REPO_ROOT / "dashboard"
 
 
-def create_app(settings=None, propagation=None, weather=None, acks=None, dashboard_dir=DASHBOARD_DIR):
+def create_app(settings=None, propagation=None, weather=None, acks=None, dashboard_dir=DASHBOARD_DIR,
+               settings_file=None, test_connections=settings_api.test_connections):
     settings = settings or settings_mod.load()
+    store = settings_api.SettingsStore(settings, settings_file)
     propagation = propagation or PropagationSource(settings)
     weather = weather or WeatherSource(settings)
     acks = acks or alerts_mod.AckStore()
@@ -71,6 +74,28 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, dashboa
             return jsonify({"error": "no current alert with that id"}), 404
         acks.add(alert_id)
         return jsonify({"acknowledged": alert_id})
+
+    @app.get("/api/settings")
+    def api_settings():
+        response = jsonify(store.view())
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.put("/api/settings")
+    def api_settings_put():
+        ok, body = store.update(request.get_json(silent=True))
+        return jsonify(body), (200 if ok else 400)
+
+    @app.post("/api/settings/test")
+    def api_settings_test():
+        """Test connections, optionally for addresses not yet saved:
+        {"sources": {"propmon_url": "...", "sentinel_url": "..."}}"""
+        body = request.get_json(silent=True)
+        sources = body.get("sources") if isinstance(body, dict) else None
+        if sources is not None and not (isinstance(sources, dict) and all(
+                k in ("propmon_url", "sentinel_url") and isinstance(v, str) for k, v in sources.items())):
+            return jsonify({"errors": ["sources: propmon_url and/or sentinel_url addresses"]}), 400
+        return jsonify({"results": test_connections(settings, sources)})
 
     @app.get("/api/system")
     def api_system():
