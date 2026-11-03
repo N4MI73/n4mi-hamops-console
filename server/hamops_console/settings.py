@@ -45,6 +45,7 @@ DEFAULTS = {
         "conditions_stale_min": 5,
         "lightning_stale_min": 5,
         "station_obs_stale_min": 90,
+        "forecast_fetch_min": 30,
         "forecast_stale_hours": 12,
         "lightning_notify_mi": 10,
         "lightning_high_mi": 5,

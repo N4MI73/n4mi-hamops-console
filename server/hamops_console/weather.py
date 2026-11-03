@@ -17,9 +17,10 @@ Consumer rules agreed with Weather Sentinel (2026-10-12), all applied here:
   3. Read defensively: unknown fields are ignored; a missing field is
      unknown (null) -- never an exception and never "all clear".
 
-The NWS forecast (both modes) and Field Mode's own NWS sources come in later
-steps; until then `forecast` and `weather_radio` are null, and in Field Mode
-the alerts and conditions blocks say they aren't built yet.
+The NWS forecast (both modes) comes from forecast.py. Field Mode's own NWS
+alerts and station observations come in a later step; until then, in Field
+Mode the alerts and conditions blocks say they aren't built yet.
+`weather_radio` is null until the stored NOAA Weather Radio list is built.
 
 Fetching is lazy, as for propagation: at most once per `sentinel_fetch_min`,
 keeping the last good reply.
@@ -31,7 +32,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from . import alert_classes, freshness
+from . import alert_classes, freshness, grid as grid_mod
+from .forecast import ForecastSource
 
 SOURCE = "Weather Sentinel"
 PATH = "/api/conditions"
@@ -150,8 +152,9 @@ def fetch_sentinel(base_url, timeout=TIMEOUT_SEC):
 class WeatherSource:
     """Keeps the last good Weather Sentinel reply and builds the weather blocks."""
 
-    def __init__(self, settings, fetch=fetch_sentinel, clock=freshness.utcnow):
+    def __init__(self, settings, fetch=fetch_sentinel, clock=freshness.utcnow, forecast=None):
         self.settings = settings
+        self.forecast = forecast or ForecastSource(settings, clock=clock)
         self._fetch = fetch
         self._clock = clock
         self._lock = threading.Lock()
@@ -301,29 +304,67 @@ class WeatherSource:
         out = freshness.block("NWS", None, None, 0, error=message)
         return out
 
+    def _location(self):
+        mode = self.settings["mode"]
+        station = self.settings["station"].get(mode, {})
+        grid = station.get("grid")
+        location = {"label": mode.capitalize(), "grid": grid,
+                    "grid_source": station.get("grid_source")}
+        location.update(self.forecast.location())
+        location["grid_warning"] = (grid_mod.COARSE_WARNING
+                                    if grid_mod.is_valid(grid) and len(grid.strip()) == 4 else None)
+        return location
+
     def blocks(self):
         """The weather blocks for GET /api/weather (everything but the envelope)."""
         now = self._clock()
-        mode = self.settings["mode"]
-        station = self.settings["station"].get(mode, {})
-        location = {"label": mode.capitalize(), "grid": station.get("grid"),
-                    "grid_source": station.get("grid_source"),
-                    "nws_office": None, "nws_zone": None, "nws_county": None}
-        if mode != "home":
+        forecast = self.forecast.block()
+        if self.settings["mode"] != "home":
             msg = "Field Mode weather is not built yet"
             alerts = self._not_built(msg)
             alerts["items"] = []
             conditions = self._not_built(msg)
             conditions.update(EMPTY_CONDITIONS)
-            return {"location": location, "alerts": alerts, "conditions": conditions,
-                    "lightning": None, "weather_radio": None, "forecast": None}
+            return {"location": self._location(), "alerts": alerts, "conditions": conditions,
+                    "lightning": None, "weather_radio": None, "forecast": forecast}
         with self._lock:
             self._refresh_if_due(now)
-            return {
-                "location": location,
-                "alerts": self._alerts_block(now),
+            alerts = self._alerts_block(now)
+            out = {
+                "location": self._location(),
+                "alerts": alerts,
                 "conditions": self._conditions_block(now),
                 "lightning": self._lightning_block(now),
                 "weather_radio": None,   # stored NOAA Weather Radio list: later step
-                "forecast": None,        # NWS forecast: next step
+                "forecast": forecast,
             }
+        apply_storm_alerts(forecast, alerts, now)
+        return out
+
+
+# Event names that make lightning "likely" on their own (contract section 5).
+STORM_ALERT_EVENTS = ("severe thunderstorm warning", "severe thunderstorm watch")
+STORM_WORDS = ("thunderstorm", "lightning")
+
+
+def storm_alert(item):
+    """True for a Severe Thunderstorm Warning/Watch, or a Special Weather
+    Statement whose text mentions thunderstorms or lightning."""
+    event = (item.get("event") or "").lower()
+    if event in STORM_ALERT_EVENTS:
+        return True
+    if event == "special weather statement":
+        text = " ".join(item.get(k) or "" for k in ("headline", "hazard")).lower()
+        return any(w in text for w in STORM_WORDS)
+    return False
+
+
+def apply_storm_alerts(forecast, alerts, now):
+    """An active storm alert sets lightning_outlook to likely, starting now,
+    with basis nws_alert -- even when the forecast itself shows nothing.
+    Only alerts the console is actually showing (ok or stale) count."""
+    if not forecast or alerts.get("status") not in (freshness.OK, freshness.STALE):
+        return
+    if any(storm_alert(i) for i in alerts.get("items") or []):
+        forecast["lightning_outlook"] = {"level": "likely", "start": freshness.iso(now),
+                                         "basis": "nws_alert"}

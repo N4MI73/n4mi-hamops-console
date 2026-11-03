@@ -20,6 +20,7 @@
   .unavailable, .test { color:var(--bad); border-color:#8C3631; }
   .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
   .wx { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .fc { margin-top:12px; font-size:19px; } .fc span { font-size:15px; color:var(--muted); }
   .wx div span { display:block; font-size:15px; color:var(--muted); margin-bottom:4px; }
   .wx div b { font-size:19px; font-weight:normal; }
   .nums div span { display:block; font-size:16px; color:var(--muted); } .nums div b { font-size:38px; }
@@ -54,6 +55,7 @@
         <div><span>Conditions <em id="w-c-st"></em></span><b id="w-cond">--</b></div>
         <div><span>Lightning <em id="w-l-st"></em></span><b id="w-light">--</b></div>
       </div>
+      <div class="fc"><span>Forecast <em id="w-f-st"></em></span><br><b id="w-fc">--</b></div>
       <div id="w-msg" class="msg"></div>
     </section>
     </div>
@@ -100,12 +102,18 @@ async function refresh() {
     document.getElementById("p-msg").textContent = p.message || "";
 
     const w = await (await fetch("/api/weather", {cache: "no-store"})).json();
-    const wa = w.alerts, wc = w.conditions, wl = w.lightning;
+    const wa = w.alerts, wc = w.conditions, wl = w.lightning, wf = w.forecast;
     setStatus("w-status", wa);
     const tag = b => b ? (b.status === "ok" ? "" : "· " + statusText(b)[1]) : "";
     document.getElementById("w-a-st").textContent = tag(wa);
     document.getElementById("w-c-st").textContent = tag(wc);
     document.getElementById("w-l-st").textContent = tag(wl);
+    document.getElementById("w-f-st").textContent = wf ? (wf.status === "ok" ? "· NWS " + dash((w.location || {}).nws_office) : tag(wf)) : "";
+    const per = wf && wf.periods && wf.periods[0];
+    const lo = wf && wf.lightning_outlook;
+    document.getElementById("w-fc").textContent = !per ? "--" :
+      `${per.name}: ${per.short}, ${dash(per.temperature_f)} °F` +
+      (lo ? ` · Lightning ${lo.level} from ${lo.start.slice(11, 16)}Z (${lo.basis === "nws_alert" ? "NWS alert" : "forecast"}, not detected)` : "");
     document.getElementById("w-alerts").textContent =
       wa.status === "unavailable" ? "UNAVAILABLE — not the same as no alerts" :
       wa.status === "test" ? "Station in test mode" :
@@ -115,7 +123,7 @@ async function refresh() {
     document.getElementById("w-light").textContent = !wl ? "--" :
       wl.within_5mi ? `WITHIN 5 MI (${dash(wl.closest_mi)} mi)` : wl.within_10mi ? `Within 10 mi (${dash(wl.closest_mi)} mi)` :
       wl.within_10mi === false ? `None close · ${dash(wl.strikes_recent)} in ${dash(wl.window_min)} min` : "--";
-    document.getElementById("w-msg").textContent = [wa, wc, wl].filter(b => b && b.message).map(b => b.message)
+    document.getElementById("w-msg").textContent = [wa, wc, wl, wf].filter(b => b && b.message).map(b => b.message)
       .filter((m, i, all) => all.indexOf(m) === i).join(" · ");
 
     const s = (await (await fetch("/api/system", {cache: "no-store"})).json()).system;

@@ -24,6 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 from hamops_console import alert_classes, freshness, settings as settings_mod  # noqa: E402
+from hamops_console.forecast import ForecastSource  # noqa: E402
 from hamops_console.weather import WeatherSource  # noqa: E402
 
 LIVE = {
@@ -105,7 +106,7 @@ class StandIn:
         self.reply = reply
         self.calls = 0
 
-    def __call__(self, base_url):
+    def __call__(self, url, *extra):
         self.calls += 1
         if isinstance(self.reply, Exception):
             raise self.reply
@@ -117,7 +118,10 @@ def make(reply, now, mode="home"):
     settings["mode"] = mode
     settings["sources"]["sentinel_url"] = "http://sentinel.example:8085"
     stand_in, clock = StandIn(reply), Clock(now)
-    return WeatherSource(settings, fetch=stand_in, clock=clock), stand_in, clock
+    # NWS is never contacted here: its stand-in always fails, run in-line.
+    no_nws = ForecastSource(settings, fetch=StandIn(urllib.error.URLError("offline")),
+                            clock=clock, run=lambda job: job())
+    return WeatherSource(settings, fetch=stand_in, clock=clock, forecast=no_nws), stand_in, clock
 
 
 class AlertClasses(unittest.TestCase):
@@ -186,7 +190,7 @@ class LiveSample(unittest.TestCase):
         self.assertEqual((l["strikes_recent"], l["window_min"], l["closest_mi"]), (0, 10, None))
 
     def test_later_blocks_not_yet_built(self):
-        self.assertIsNone(self.w["forecast"])
+        self.assertEqual(self.w["forecast"]["status"], "unavailable")  # NWS offline here
         self.assertIsNone(self.w["weather_radio"])
         self.assertEqual(self.w["location"]["label"], "Home")
 
