@@ -208,9 +208,11 @@ class Endpoints(unittest.TestCase):
         self.client = create_app(make_settings(), propagation=src, dashboard_dir=dashboard).test_client()
 
     def test_index_served(self):
-        r = self.client.get("/")
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b"<title>test</title>", r.data)
+        # "with" closes the file Flask opened for the page (otherwise a
+        # harmless ResourceWarning on the Pi's Python).
+        with self.client.get("/") as r:
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(b"<title>test</title>", r.data)
 
     def test_propagation_envelope(self):
         body = self.client.get("/api/propagation").get_json()
