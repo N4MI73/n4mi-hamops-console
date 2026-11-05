@@ -203,6 +203,11 @@ class Endpoints(unittest.TestCase):
         dashboard = tempfile.mkdtemp()
         with open(os.path.join(dashboard, "index.html"), "w") as f:
             f.write("<!doctype html><title>test</title>")
+        with open(os.path.join(dashboard, "check.html"), "w") as f:
+            f.write("<title>check</title>")
+        os.makedirs(os.path.join(dashboard, "fonts"))
+        with open(os.path.join(dashboard, "fonts", "x.woff2"), "wb") as f:
+            f.write(b"wOF2")
         src = PropagationSource(make_settings(propmon_url="http://propmon:8076"),
                                 fetch=lambda base: PROPMON_SAMPLE, clock=Clock(T0))
         self.client = create_app(make_settings(), propagation=src, dashboard_dir=dashboard).test_client()
@@ -213,6 +218,25 @@ class Endpoints(unittest.TestCase):
         with self.client.get("/") as r:
             self.assertEqual(r.status_code, 200)
             self.assertIn(b"<title>test</title>", r.data)
+
+    def test_check_page_and_static_files(self):
+        with self.client.get("/check") as r:
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(b"<title>check</title>", r.data)
+        with self.client.get("/static/fonts/x.woff2") as r:
+            self.assertEqual(r.status_code, 200)
+
+    def test_real_dashboard_files_exist(self):
+        """The page, its script, style and every font the style names are in the repo."""
+        import re
+        root = os.path.join(os.path.dirname(os.path.dirname(HERE)), "dashboard")
+        for name in ("index.html", "home.js", "home.css", "check.html"):
+            self.assertTrue(os.path.exists(os.path.join(root, name)), name)
+        with open(os.path.join(root, "home.css")) as f:
+            fonts = re.findall(r'url\("([^"]+)"\)', f.read())
+        self.assertEqual(len(fonts), 5)
+        for font in fonts:
+            self.assertTrue(os.path.exists(os.path.join(root, font)), font)
 
     def test_propagation_envelope(self):
         body = self.client.get("/api/propagation").get_json()

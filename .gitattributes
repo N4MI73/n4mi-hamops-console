@@ -5,3 +5,5 @@
 pi/** text eol=lf
 *.sh text eol=lf
 *.py text eol=lf
+# Fonts are binary: never touch their bytes.
+*.woff2 binary

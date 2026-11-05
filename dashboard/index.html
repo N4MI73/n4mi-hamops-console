@@ -2,192 +2,108 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ham Ops Console — service check</title>
-<style>
-  :root { --bg:#0A0E13; --panel:#11171F; --line:#1E2731; --ink:#E6EBF0; --muted:#A3B0BE;
-          --good:#3FCF6E; --fair:#F2B33D; --poor:#7D8B99; --bad:#F0524A; }
-  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:sans-serif; }
-  main { box-sizing:border-box; height:100%; padding:16px; display:grid; grid-template-rows:auto 1fr auto; gap:12px; }
-  h1 { margin:0; font-size:26px; } h1 span { font-size:18px; color:var(--muted); font-weight:normal; margin-left:12px; }
-  .grid { display:grid; grid-template-columns:1.3fr 1fr; gap:12px; min-height:0; }
-  .col { display:grid; grid-template-rows:auto 1fr; gap:12px; min-height:0; }
-  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
-  .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
-  .head b { font-size:16px; letter-spacing:.1em; color:var(--muted); }
-  .status { font-size:15px; font-weight:bold; padding:3px 8px; border-radius:6px; border:1px solid var(--line); }
-  .ok { color:var(--good); border-color:#2F8F52; } .stale { color:var(--fair); border-color:#8A6A22; }
-  .unavailable, .test { color:var(--bad); border-color:#8C3631; }
-  .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
-  .wx { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-  .al { list-style:none; margin:0; padding:0; display:grid; gap:6px; font-size:15px; }
-  .al li { display:flex; gap:10px; align-items:baseline; background:var(--bg); border-radius:8px; padding:6px 10px; border-left:6px solid var(--poor); }
-  .al li.red { border-color:var(--bad); } .al li.yellow { border-color:var(--fair); }
-  .al li.green { border-color:var(--good); } .al li.blue { border-color:#4A90E2; }
-  .al li b { white-space:nowrap; } .al li span { color:var(--muted); flex:1; }
-  .al li em { color:var(--muted); font-size:14px; white-space:nowrap; }
-  .al button { font-size:16px; padding:6px 10px; border-radius:6px; border:1px solid var(--bad); background:#2A1210; color:var(--ink); }
-  .fc { margin-top:12px; font-size:19px; } .fc span { font-size:15px; color:var(--muted); }
-  .wx div span { display:block; font-size:15px; color:var(--muted); margin-bottom:4px; }
-  .wx div b { font-size:19px; font-weight:normal; }
-  .nums div span { display:block; font-size:16px; color:var(--muted); } .nums div b { font-size:38px; }
-  .bands { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
-  .band { background:var(--bg); border-radius:8px; padding:8px 0; text-align:center; }
-  .band b { display:block; font-size:20px; } .band span { font-size:15px; font-weight:bold; }
-  .good { color:var(--good); } .fair { color:var(--fair); } .poor, .none { color:var(--poor); }
-  dl { display:grid; grid-template-columns:auto 1fr; gap:8px 14px; margin:0; font-size:19px; }
-  dt { color:var(--muted); } dd { margin:0; }
-  .msg { color:var(--fair); font-size:16px; margin-top:10px; min-height:20px; }
-  footer { color:var(--muted); font-size:15px; }
-</style>
+<meta name="viewport" content="width=1280, height=720">
+<title>Ham Ops Console</title>
+<link rel="stylesheet" href="/static/home.css">
 </head>
 <body>
-<main>
-  <h1>Ham Ops Console <span>service check page — Phase 1 · not the approved dashboard</span></h1>
-  <div class="grid">
-    <div class="col">
-    <section>
-      <div class="head"><b>PROPAGATION</b><span id="p-status" class="status">…</span></div>
-      <div class="nums">
-        <div><span>SFI</span><b id="p-sfi">--</b></div><div><span>K index</span><b id="p-k">--</b></div>
-        <div><span>A index</span><b id="p-a">--</b></div><div><span>X-ray</span><b id="p-x">--</b></div>
-      </div>
-      <div id="p-bands" class="bands"></div>
-      <div id="p-msg" class="msg"></div>
-    </section>
-    <section>
-      <div class="head"><b>WEATHER</b><span id="w-status" class="status">…</span></div>
-      <div class="wx">
-        <div><span>NWS alerts <em id="w-a-st"></em></span><b id="w-alerts">--</b></div>
-        <div><span>Conditions <em id="w-c-st"></em></span><b id="w-cond">--</b></div>
-        <div><span>Lightning <em id="w-l-st"></em></span><b id="w-light">--</b></div>
-      </div>
-      <div class="fc"><span>Forecast <em id="w-f-st"></em></span><br><b id="w-fc">--</b></div>
-      <div id="w-msg" class="msg"></div>
-    </section>
+<!-- Ham Ops Console -- Home screen, built from the approved mockup (contracts 0.4).
+     All data comes from the console service on this Pi; see home.js. The service
+     check page that used to be here is at /check. -->
+<div class="screen">
+
+  <header class="status-bar">
+    <div class="clock"><span class="utc num" id="utc">--:--Z</span><span class="local" id="local">--</span></div>
+    <span class="mode-tag" id="mode">--</span>
+    <span class="station" id="station">--</span>
+    <div class="spacer"></div>
+    <div class="pills">
+      <span class="pill" id="pill-internet"><span class="dot"></span>Internet</span>
+      <span class="pill" id="pill-nas"><span class="dot"></span>NAS</span>
+      <span class="pill" id="pill-gps"><span class="dot"></span><span class="label">GPS</span></span>
     </div>
-    <div class="col">
-    <section>
-      <div class="head"><b>ALERTS</b><span class="status">ranked by the service</span></div>
-      <ul id="alerts" class="al"></ul>
+  </header>
+
+  <nav class="modules" aria-label="Modules">
+    <button class="current" aria-current="page">Home</button>
+    <button disabled>Propagation<span class="soon">Coming</span></button>
+    <button disabled>Weather<span class="soon">Coming</span></button>
+    <button disabled id="alerts-button">Alerts<span class="soon">Coming</span><span class="badge" id="badge" hidden></span></button>
+    <button disabled>System<span class="soon">Coming</span></button>
+  </nav>
+
+  <section class="priority" id="priority" aria-label="Priority" aria-live="polite">
+    <span class="lamp"></span>
+    <div class="text">
+      <span class="label" id="p-label">RIGHT NOW</span>
+      <span class="title" id="p-title">Starting up…</span>
+      <span class="detail" id="p-detail" hidden></span>
+    </div>
+    <span class="aside" id="p-aside"></span>
+    <div class="card-actions">
+      <button class="act" id="p-ack" hidden>Acknowledge</button>
+      <button class="act quiet" id="p-clear" hidden>Clear hold</button>
+    </div>
+    <div class="pager" id="pager" hidden>
+      <button aria-label="Previous item" id="p-prev">‹</button>
+      <span class="count" id="p-count">1 of 1</span>
+      <button aria-label="Next item" id="p-next">›</button>
+    </div>
+  </section>
+
+  <div class="tiles">
+
+    <section class="tile" id="t-prop" aria-label="Propagation">
+      <div class="tile-head"><span class="name">PROPAGATION</span><span class="fresh" id="prop-fresh">--</span></div>
+      <div class="figures">
+        <div class="figure"><span>SFI</span><span class="num" id="sfi">--</span></div>
+        <div class="figure"><span>K index</span><span class="num" id="kidx">--</span></div>
+        <div class="figure"><span>A index</span><span class="num" id="aidx">--</span></div>
+        <div class="figure"><span>X-ray</span><span class="num" id="xray">--</span></div>
+      </div>
+      <div class="bands" id="bands"></div>
+      <span class="small" id="prop-extra">--</span>
     </section>
-    <section>
-      <div class="head"><b>SYSTEM</b><span id="s-status" class="status">…</span></div>
-      <dl>
-        <dt>CPU</dt><dd id="s-cpu">--</dd>
-        <dt>Power</dt><dd id="s-power">--</dd>
-        <dt>Memory</dt><dd id="s-mem">--</dd>
-        <dt>Disk</dt><dd id="s-disk">--</dd>
-        <dt>Network</dt><dd id="s-net">--</dd>
-        <dt>Clock</dt><dd id="s-clock">--</dd>
-        <dt>GPS</dt><dd id="s-gps">--</dd>
-        <dt>Service</dt><dd id="s-svc">--</dd>
+
+    <section class="tile" id="t-wx" aria-label="Weather">
+      <div class="tile-head"><span class="name">WEATHER</span><span class="fresh" id="wx-fresh">--</span></div>
+      <div class="big-temp"><span class="num" id="temp">--</span><span id="feels">--</span></div>
+      <dl class="facts">
+        <dt>Wind</dt><dd id="wind">--</dd>
+        <dt>Rain</dt><dd id="rain">--</dd>
+        <dt>Pressure</dt><dd id="pressure">--</dd>
+        <dt id="fc-name">Today</dt><dd id="fc">--</dd>
       </dl>
+      <div class="lines">
+        <div class="line"><span class="dot" id="lt-dot"></span><span id="lt-text">--</span></div>
+        <div class="line"><span class="dot" id="nws-dot"></span><span id="nws-text">--</span></div>
+      </div>
     </section>
-    </div>
+
+    <section class="tile" id="t-sys" aria-label="System">
+      <div class="tile-head"><span class="name">SYSTEM</span><span class="fresh">this Pi</span></div>
+      <dl class="facts">
+        <dt>CPU</dt><dd id="cpu">--</dd>
+        <dt>Disk</dt><dd id="disk">--</dd>
+        <dt>Network</dt><dd id="net">--</dd>
+        <dt>Power</dt><dd id="power">--</dd>
+      </dl>
+      <span class="sources-label">SOURCES</span>
+      <div class="lines" id="sources" style="margin-top: 0"></div>
+    </section>
+
   </div>
-  <footer id="foot">Waiting for the console service…</footer>
-</main>
-<script>
-// One shared rule for turning a block's freshness status into wording (contract section 2).
-function statusText(b) {
-  if (!b) return ["unavailable", "UNAVAILABLE"];
-  if (b.status === "stale") return ["stale", "STALE · " + Math.round((b.age_sec || 0) / 60) + " MIN"];
-  if (b.status === "ok") return ["ok", b.source + " · " + Math.round((b.age_sec || 0) / 60) + " min ago"];
-  return [b.status, b.status.toUpperCase()];
-}
-const dash = v => (v === null || v === undefined) ? "--" : v;
-function setStatus(id, block) {
-  const [cls, text] = statusText(block);
-  const el = document.getElementById(id); el.className = "status " + cls; el.textContent = text;
-}
-async function refresh() {
-  try {
-    const p = (await (await fetch("/api/propagation", {cache: "no-store"})).json()).propagation;
-    setStatus("p-status", p);
-    document.getElementById("p-sfi").textContent = dash(p.sfi);
-    document.getElementById("p-k").textContent = dash(p.k_index);
-    document.getElementById("p-a").textContent = dash(p.a_index);
-    document.getElementById("p-x").textContent = dash(p.xray);
-    const stale = p.status !== "ok";
-    document.getElementById("p-bands").innerHTML = (p.bands || []).map(b =>
-      `<div class="band"><b>${b.band}</b><span class="${stale ? "none" : (b.rating || "none")}">${(b.rating || "--").toUpperCase()}</span></div>`).join("");
-    document.getElementById("p-msg").textContent = p.message || "";
 
-    const w = await (await fetch("/api/weather", {cache: "no-store"})).json();
-    const wa = w.alerts, wc = w.conditions, wl = w.lightning, wf = w.forecast;
-    setStatus("w-status", wa);
-    const tag = b => b ? (b.status === "ok" ? "" : "· " + statusText(b)[1]) : "";
-    document.getElementById("w-a-st").textContent = tag(wa);
-    document.getElementById("w-c-st").textContent = tag(wc);
-    document.getElementById("w-l-st").textContent = tag(wl);
-    document.getElementById("w-f-st").textContent = wf ? (wf.status === "ok" ? "· NWS " + dash((w.location || {}).nws_office) : tag(wf)) : "";
-    const per = wf && wf.periods && wf.periods[0];
-    const lo = wf && wf.lightning_outlook;
-    document.getElementById("w-fc").textContent = !per ? "--" :
-      `${per.name}: ${per.short}, ${dash(per.temperature_f)} °F` +
-      (lo ? ` · Lightning ${lo.level} from ${lo.start.slice(11, 16)}Z (${lo.basis === "nws_alert" ? "NWS alert" : "forecast"}, not detected)` : "");
-    document.getElementById("w-alerts").textContent =
-      wa.status === "unavailable" ? "UNAVAILABLE — not the same as no alerts" :
-      wa.status === "test" ? "Station in test mode" :
-      wa.items.length ? wa.items.map(i => i.event).join(", ") : "None in effect";
-    document.getElementById("w-cond").textContent = wc.status === "unavailable" ? "--" :
-      `${dash(wc.temperature_f)} °F · ${dash(wc.humidity_pct)} % · ${dash(wc.wind_dir)} ${dash(wc.wind_mph)} mph`;
-    const clearedNote = wl && wl.cleared_at && !wl.within_5mi && !wl.within_10mi
-      ? ` · cleared by operator ${new Date(wl.cleared_at).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}` : "";
-    document.getElementById("w-light").textContent = (!wl ? "--" :
-      wl.within_5mi ? `WITHIN 5 MI (${dash(wl.closest_mi)} mi)` : wl.within_10mi ? `Within 10 mi (${dash(wl.closest_mi)} mi)` :
-      wl.within_10mi === false ? `None close · ${dash(wl.strikes_recent)} in ${dash(wl.window_min)} min` : "--") + clearedNote;
-    document.getElementById("w-msg").textContent = [wa, wc, wl, wf].filter(b => b && b.message).map(b => b.message)
-      .filter((m, i, all) => all.indexOf(m) === i).join(" · ");
+  <footer class="toolbar">
+    <button id="refresh">Refresh</button>
+    <button disabled>Settings<span class="soon">Coming</span></button>
+    <button disabled>Sleep<span class="soon">Coming</span></button>
+    <div class="spacer"></div>
+    <button class="shutdown" disabled>Shut down…<span class="soon">Coming</span></button>
+  </footer>
 
-    const esc = t => String(t ?? "").replace(/[&<>"]/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[ch]));
-    const items = (await (await fetch("/api/alerts", {cache: "no-store"})).json()).items;
-    document.getElementById("alerts").innerHTML = items.slice(0, 3).map(i =>
-      `<li class="${i.color}"><b>${esc(i.title)}</b><span>${esc(i.detail)}</span>` +
-      (i.critical && !i.acknowledged ? `<button data-id="${esc(i.ref.id)}">Acknowledge</button>` : "") +
-      (i.ref.block === "weather.lightning" ? `<button data-clear="1">Clear hold</button>` : "") +
-      `<em>${i.tier === "badge" ? "badge" : i.critical ? (i.acknowledged ? "critical · ack'd" : "CRITICAL") : ""}</em></li>`).join("") +
-      (items.length > 3 ? `<li><span>+ ${items.length - 3} more</span></li>` : "");
-
-    const s = (await (await fetch("/api/system", {cache: "no-store"})).json()).system;
-    setStatus("s-status", s);
-    document.getElementById("s-cpu").textContent = `${dash(s.cpu_temp_c)} °C · load ${dash(s.cpu_load_pct)} %`;
-    const pw = s.power || {};
-    document.getElementById("s-power").textContent = pw.undervoltage_now === null ? "--" :
-      (pw.undervoltage_now ? "UNDER-VOLTAGE NOW" : pw.throttled_now ? "THROTTLED NOW" : "OK") +
-      (pw.undervoltage_since_boot ? " · under-voltage since boot" : "");
-    document.getElementById("s-mem").textContent = `${dash(s.memory_used_pct)} % used`;
-    document.getElementById("s-disk").textContent = `${dash(s.disk_used_gb)} of ${dash(s.disk_total_gb)} GB`;
-    const n = s.network || {};
-    document.getElementById("s-net").textContent = `${dash(n.connection)} · ${dash(n.ip)}`;
-    const c = s.clock || {};
-    document.getElementById("s-clock").textContent = c.synced === null ? "--" : (c.synced ? "synchronised" : "NOT synchronised");
-    const g = s.gps || {};
-    document.getElementById("s-gps").textContent = g.present ? "receiver connected" : "not connected";
-    document.getElementById("s-svc").textContent = `v${s.service.version} · up ${Math.round((s.uptime_sec || 0) / 3600)} h (Pi)`;
-    document.getElementById("foot").textContent = "Updated " + new Date().toISOString().slice(11, 19) + "Z · refreshes every 15 s";
-  } catch (e) {
-    document.getElementById("foot").textContent = "Console service not answering (" + e.message + ")";
-  }
-}
-document.getElementById("alerts").addEventListener("click", async e => {
-  const t = e.target;
-  if (t.dataset && t.dataset.clear) {
-    // Two steps, so a stray touch can't end a lightning hold.
-    if (t.dataset.clear === "1") { t.dataset.clear = "2"; t.textContent = "Confirm clear"; return; }
-    t.disabled = true;
-    await fetch("/api/alerts/clear-hold", {method: "POST"});
-    refresh();
-    return;
-  }
-  const id = t.dataset && t.dataset.id;
-  if (!id) return;
-  e.target.disabled = true;
-  await fetch("/api/alerts/ack", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({id})});
-  refresh();
-});
-refresh(); setInterval(refresh, 15000);
-</script>
+</div>
+<div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
+<script src="/static/home.js"></script>
 </body>
 </html>

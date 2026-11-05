@@ -7,7 +7,7 @@ A portable Raspberry Pi 5 touchscreen operations console for amateur radio. It p
 
 Both modes are the same dashboard reading the same JSON from a small service on the Pi; only that service's data sources change.
 
-> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the console service (propagation relay, home weather relay, NWS forecast, alert ranking, the settings API and Pi status, with a plain check page).
+> **Status (November 2026): early development.** The hardware is built and the design is settled. What's here so far: the kiosk display setup, a touch test page, the example settings file, the console service (propagation relay, home weather relay, NWS forecast, alert ranking, the settings API and Pi status) and the dashboard's Home screen; the detail pages come next.
 
 ## How it works
 
@@ -29,7 +29,7 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 | Folder | Contents |
 |---|---|
 | `server/` | The console service (Python + Flask). So far: propagation relay from PropMon, home weather relay from Weather Sentinel, the NWS forecast, the ranked alert list, the settings API, the Pi's own status, the shared freshness rule, alert classification, NWS alert text lines, and tests. See `server/README.md` |
-| `dashboard/` | The touchscreen web page. For now a plain service check page; the real dashboard comes later |
+| `dashboard/` | The touchscreen web page: the Home screen so far, with its bundled fonts, and a service check page at `/check`. See `dashboard/README.md` |
 | `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium) and the service's systemd unit. See `pi/README.md` |
 | `config/` | `settings.example.json`, the template for the console's settings |
 | `diagnostics/` | Small standalone test tools, e.g. `kiosk-test.html` for checking screen rotation and touch |

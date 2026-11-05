@@ -42,6 +42,11 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, dashboa
     def index():
         return send_from_directory(dashboard_dir, "index.html")
 
+    @app.get("/check")
+    def check_page():
+        """The plain service check page (diagnostics), kept beside the dashboard."""
+        return send_from_directory(dashboard_dir, "check.html")
+
     @app.get("/static/<path:name>")
     def static_file(name):
         return send_from_directory(dashboard_dir, name)

@@ -6,7 +6,9 @@ The small Python service on the Pi that the dashboard talks to, run under system
 
 | Endpoint | What it returns |
 |---|---|
-| `GET /` | The dashboard page (`dashboard/index.html`; for now a plain service check page) |
+| `GET /` | The dashboard (`dashboard/index.html`, the Home screen) |
+| `GET /check` | The plain service check page (`dashboard/check.html`), for diagnostics |
+| `GET /static/<file>` | The dashboard's script, style and fonts |
 | `GET /api/propagation` | Propagation block, relayed from PropMon in Home Mode |
 | `GET /api/weather` | Weather blocks: NWS alerts, local conditions and lightning, relayed from Weather Sentinel in Home Mode. Plus the NWS forecast for the station grid (both modes). The NOAA Weather Radio block is `null` until a later step; Field Mode alerts and conditions aren't built yet |
 | `GET /api/alerts` | The ranked list behind the Priority Card and Alerts page: card items in the approved order, then badge items; never empty (`all_quiet`) |
