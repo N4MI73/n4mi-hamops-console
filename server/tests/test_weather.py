@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 from hamops_console import alert_classes, freshness, settings as settings_mod  # noqa: E402
 from hamops_console.forecast import ForecastSource  # noqa: E402
-from hamops_console.weather import WeatherSource  # noqa: E402
+from hamops_console.weather import LightningState, WeatherSource  # noqa: E402
 
 LIVE = {
     "lightning": {"active": False,
@@ -113,7 +113,7 @@ class StandIn:
         return copy.deepcopy(self.reply)
 
 
-def make(reply, now, mode="home"):
+def make(reply, now, mode="home", state_path=None):
     settings = settings_mod.load(os.path.join(tempfile.mkdtemp(), "missing.json"))
     settings["mode"] = mode
     settings["sources"]["sentinel_url"] = "http://sentinel.example:8085"
@@ -121,7 +121,9 @@ def make(reply, now, mode="home"):
     # NWS is never contacted here: its stand-in always fails, run in-line.
     no_nws = ForecastSource(settings, fetch=StandIn(urllib.error.URLError("offline")),
                             clock=clock, run=lambda job: job())
-    return WeatherSource(settings, fetch=stand_in, clock=clock, forecast=no_nws), stand_in, clock
+    state = LightningState(state_path or os.path.join(tempfile.mkdtemp(), "lightning.json"))
+    return (WeatherSource(settings, fetch=stand_in, clock=clock, forecast=no_nws, lightning_state=state),
+            stand_in, clock)
 
 
 class AlertClasses(unittest.TestCase):
@@ -343,6 +345,97 @@ class Failures(unittest.TestCase):
     def test_not_a_json_object(self):
         source, _, _ = make(["not", "an", "object"], T_LIVE)
         self.assertIn("unexpected", source.blocks()["alerts"]["message"])
+
+
+class LightningHold(unittest.TestCase):
+    """Contracts 0.4: the hold survives a restart; the operator's Clear ends
+    both holds until the next strike."""
+
+    def setUp(self):
+        self.path = os.path.join(tempfile.mkdtemp(), "state", "lightning.json")
+
+    def test_survives_restart(self):
+        source, _, _ = make(storm_reply(), T_STORM, state_path=self.path)
+        before = source.blocks()["lightning"]
+        self.assertTrue(os.path.exists(self.path))
+        # A new service process, ten minutes on, with Sentinel's window now empty.
+        later, _, _ = make(copy.deepcopy(LIVE), T_STORM + timedelta(minutes=10), state_path=self.path)
+        after = later.blocks()["lightning"]
+        self.assertIs(after["within_5mi"], True)
+        self.assertEqual(after["hold_since_5mi"], before["hold_since_5mi"])
+        self.assertEqual(after["hold_until_5mi"], "2026-11-01T15:21:32Z")
+
+    def test_damaged_state_file_is_empty(self):
+        os.makedirs(os.path.dirname(self.path))
+        with open(self.path, "w") as f:
+            f.write("{ broken")
+        source, _, _ = make(copy.deepcopy(LIVE), T_LIVE, state_path=self.path)
+        self.assertIs(source.blocks()["lightning"]["within_5mi"], False)
+
+    def test_clear_ends_both_holds_until_next_strike(self):
+        source, stand_in, clock = make(storm_reply(), T_STORM, state_path=self.path)
+        reply = storm_reply()
+        reply["lightning"]["close"]["strikes_last_minute"] = 8
+        stand_in.reply = reply
+        clock.now = T_STORM + timedelta(minutes=2)
+        l = source.blocks()["lightning"]
+        self.assertTrue(l["within_5mi"] and l["within_10mi"] and l["frequent"])
+        clock.now = T_STORM + timedelta(minutes=3)
+        cleared = source.clear_hold()
+        clock.now = T_STORM + timedelta(minutes=4)     # Sentinel still reports the old strikes
+        l = source.blocks()["lightning"]
+        self.assertEqual((l["within_5mi"], l["within_10mi"], l["frequent"]), (False, False, False))
+        self.assertIsNone(l["hold_until_5mi"])
+        self.assertIsNone(l["hold_until_10mi"])
+        self.assertEqual(l["cleared_at"], freshness.iso(cleared))
+        # A new strike after the clear starts a fresh hold with a new id.
+        new = storm_reply()
+        epoch = int(cleared.timestamp()) + 60
+        new["lightning"]["close"]["last_strike_epoch"] = epoch
+        new["lightning"]["most_recent_strike_epoch"] = epoch
+        stand_in.reply = new
+        clock.now = T_STORM + timedelta(minutes=6)
+        l = source.blocks()["lightning"]
+        self.assertTrue(l["within_5mi"] and l["within_10mi"])
+        self.assertEqual(l["hold_since_5mi"], freshness.iso(datetime.fromtimestamp(epoch, tz=timezone.utc)))
+
+    def test_clear_survives_restart(self):
+        source, _, clock = make(storm_reply(), T_STORM, state_path=self.path)
+        source.blocks()
+        clock.now = T_STORM + timedelta(minutes=1)
+        source.clear_hold()
+        later, _, _ = make(storm_reply(), T_STORM + timedelta(minutes=2), state_path=self.path)
+        l = later.blocks()["lightning"]
+        self.assertEqual((l["within_5mi"], l["within_10mi"]), (False, False))
+        self.assertIsNotNone(l["cleared_at"])
+
+    def test_cleared_note_shown_for_24_hours(self):
+        source, _, clock = make(copy.deepcopy(LIVE), T_LIVE, state_path=self.path)
+        source.clear_hold()
+        clock.now = T_LIVE + timedelta(hours=23)
+        self.assertIsNotNone(source.blocks()["lightning"]["cleared_at"])
+        clock.now = T_LIVE + timedelta(hours=25)
+        self.assertIsNone(source.blocks()["lightning"]["cleared_at"])
+
+    def test_untimed_close_strike_uses_most_recent_strike_time(self):
+        reply = storm_reply()
+        reply["lightning"]["close"]["last_distance_mi"] = 8.0     # last close strike beyond 5 mi
+        reply["lightning"]["closest_distance_mi"] = 4.0           # but one earlier in the window inside 5
+        source, _, _ = make(reply, T_STORM, state_path=self.path)
+        l = source.blocks()["lightning"]
+        self.assertIs(l["within_5mi"], True)
+        self.assertEqual(l["hold_since_5mi"], "2026-11-01T14:51:32Z")   # Sentinel's most recent strike
+
+    def test_untimed_strike_before_clear_starts_nothing(self):
+        reply = storm_reply()
+        reply["lightning"]["close"]["last_distance_mi"] = 8.0
+        reply["lightning"]["closest_distance_mi"] = 4.0
+        source, stand_in, clock = make(reply, T_STORM, state_path=self.path)
+        source.blocks()
+        clock.now = T_STORM + timedelta(minutes=2)
+        source.clear_hold()
+        clock.now = T_STORM + timedelta(minutes=4)
+        self.assertIs(source.blocks()["lightning"]["within_5mi"], False)
 
 
 class FieldMode(unittest.TestCase):

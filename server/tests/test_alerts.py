@@ -302,6 +302,34 @@ class Endpoints(unittest.TestCase):
         with open(self.store.path) as f:
             self.assertIn("urn:tor", json.load(f))
 
+    def test_clear_hold_needs_a_lightning_item(self):
+        r = self.client.post("/api/alerts/clear-hold")
+        self.assertEqual((r.status_code, r.get_json()), (409, {"error": "No lightning hold to clear"}))
+
+    def test_clear_hold(self):
+        from hamops_console.app import create_app
+
+        class Stormy:
+            cleared = []
+
+            def block(self):
+                return prop()
+
+            def blocks(self):
+                l = dict(QUIET_LIGHTNING, within_10mi=True, closest_mi=8.0)
+                return weather(lightning=l)
+
+            def clear_hold(self):
+                self.cleared.append(NOW)
+                return NOW
+
+        stormy = Stormy()
+        client = create_app(SETTINGS, propagation=stormy, weather=stormy, acks=self.store,
+                            dashboard_dir=tempfile.mkdtemp()).test_client()
+        r = client.post("/api/alerts/clear-hold")
+        self.assertEqual((r.status_code, r.get_json()), (200, {"cleared_at": "2026-11-01T14:52:00Z"}))
+        self.assertEqual(stormy.cleared, [NOW])
+
     def test_bad_acks(self):
         self.assertEqual(self.client.post("/api/alerts/ack", json={"id": "urn:nope"}).status_code, 404)
         self.assertEqual(self.client.post("/api/alerts/ack", json={"x": 1}).status_code, 400)

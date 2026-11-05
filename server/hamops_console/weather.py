@@ -22,20 +22,30 @@ alerts and station observations come in a later step; until then, in Field
 Mode the alerts and conditions blocks say they aren't built yet.
 `weather_radio` is null until the stored NOAA Weather Radio list is built.
 
+The console's own lightning state -- the 5-mile hold and the operator's
+Clear -- is saved on the Pi (LightningState) so it survives a restart.
+Clear ends both holds until the next strike; it never writes to Sentinel.
+
 Fetching is lazy, as for propagation: at most once per `sentinel_fetch_min`,
 keeping the last good reply.
 """
 
 import json
+import logging
+import os
 import threading
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from . import alert_classes, freshness, grid as grid_mod
 from .forecast import ForecastSource
 
+log = logging.getLogger(__name__)
+
 SOURCE = "Weather Sentinel"
+CLEARED_SHOWN_HOURS = 24
 PATH = "/api/conditions"
 TIMEOUT_SEC = 5
 
@@ -134,6 +144,7 @@ EMPTY_LIGHTNING = {
     "within_10mi": None, "within_5mi": None, "frequent": None, "closest_mi": None,
     "last_strike_at": None, "strikes_recent": None, "window_min": None,
     "hold_until_10mi": None, "hold_until_5mi": None, "hold_since_5mi": None,
+    "cleared_at": None,
 }
 
 
@@ -149,11 +160,48 @@ def fetch_sentinel(base_url, timeout=TIMEOUT_SEC):
         return json.load(reply)
 
 
+class LightningState:
+    """The console's own lightning state, saved on the Pi so it survives a
+    service restart (contracts 0.4, section 5): the 5-mile hold (when it began
+    and when it ends) and the operator's last Clear. Kept in a small JSON file
+    beside the Acknowledge file. A missing or damaged file is treated as empty
+    and never stops the service."""
+
+    FIELDS = ("hold_5mi_since", "hold_5mi_until", "cleared_at")
+
+    def __init__(self, path=None):
+        default = Path.home() / ".local" / "state" / "hamops-console" / "lightning.json"
+        self.path = Path(path or os.environ.get("HAMOPS_STATE_LIGHTNING") or default)
+        self.hold_5mi_since = self.hold_5mi_until = self.cleared_at = None
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                data = json.load(f)
+            for field in self.FIELDS:
+                setattr(self, field, freshness.parse_time(data.get(field)) if isinstance(data, dict) else None)
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError, AttributeError) as e:
+            log.error("could not read %s (%s); starting with no lightning hold", self.path, e)
+
+    def save(self):
+        data = {field: freshness.iso(getattr(self, field)) for field in self.FIELDS}
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_name(self.path.name + ".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=1)
+            os.replace(tmp, self.path)
+        except OSError as e:
+            log.error("could not save the lightning hold to %s (%s); kept in memory", self.path, e)
+
+
 class WeatherSource:
     """Keeps the last good Weather Sentinel reply and builds the weather blocks."""
 
-    def __init__(self, settings, fetch=fetch_sentinel, clock=freshness.utcnow, forecast=None):
+    def __init__(self, settings, fetch=fetch_sentinel, clock=freshness.utcnow, forecast=None,
+                 lightning_state=None):
         self.settings = settings
+        self._state = lightning_state or LightningState()
         self.forecast = forecast or ForecastSource(settings, clock=clock)
         self._fetch = fetch
         self._clock = clock
@@ -162,8 +210,6 @@ class WeatherSource:
         self._fetched_at = None
         self._attempted_at = None
         self._error = None
-        self._hold_5mi_until = None  # the console's own 5-mile lightning hold
-        self._hold_5mi_since = None  # when the current hold began (stable id for Acknowledge)
 
     # -- settings
     def _t(self, key):
@@ -200,8 +246,11 @@ class WeatherSource:
         """The console's own 5-mile hold (contract section 5): each strike at or
         inside `lightning_high_mi` holds `within_5mi` for `lightning_hold_min`.
         Uses Sentinel's most recent close strike (distance and time) when it is
-        inside 5 mi; if only the window's closest strike is inside 5 mi and its
-        time isn't given, the hold starts now (the longer, safer choice)."""
+        inside 5 mi. If only the window's closest strike is inside 5 mi, its
+        time isn't given, so Sentinel's most recent strike time stands in: never
+        earlier than the real strike, so the hold never ends too soon (the fetch
+        time if Sentinel gives none). A strike at or before the operator's last
+        Clear is not new and starts nothing."""
         if raw.get("simulation") is True:
             return
         lightning = _dict(raw.get("lightning")) or {}
@@ -214,13 +263,31 @@ class WeatherSource:
             strike_time = _epoch(close.get("last_strike_epoch"))
         closest = _num(lightning.get("closest_distance_mi"))
         if strike_time is None and closest is not None and closest <= high:
-            strike_time = now
-        if strike_time is not None:
-            until = strike_time + hold
-            if self._hold_5mi_until is None or strike_time >= self._hold_5mi_until:
-                self._hold_5mi_since = strike_time   # a new hold, not an extension
-            if self._hold_5mi_until is None or until > self._hold_5mi_until:
-                self._hold_5mi_until = until
+            strike_time = _epoch(lightning.get("most_recent_strike_epoch")) or now
+        st = self._state
+        if strike_time is None or (st.cleared_at is not None and strike_time <= st.cleared_at):
+            return
+        until = strike_time + hold
+        changed = False
+        if st.hold_5mi_until is None or strike_time >= st.hold_5mi_until:
+            st.hold_5mi_since, changed = strike_time, True   # a new hold, not an extension
+        if st.hold_5mi_until is None or until > st.hold_5mi_until:
+            st.hold_5mi_until, changed = until, True
+        if changed:
+            st.save()
+
+    def clear_hold(self):
+        """The operator's Clear: ends both lightning holds until the next strike.
+        Sentinel's own 10-mile hold isn't touched; the console only stops
+        showing it. Returns the time of the clear."""
+        with self._lock:
+            now = self._clock()
+            st = self._state
+            st.cleared_at = now
+            st.hold_5mi_since = st.hold_5mi_until = None
+            st.save()
+            log.info("lightning hold cleared by the operator")
+            return now
 
     # -- blocks
     def _alerts_block(self, now):
@@ -277,6 +344,9 @@ class WeatherSource:
         if test:
             out["message"] = "Home weather station in test mode"
         out.update(EMPTY_LIGHTNING)
+        cleared = self._state.cleared_at
+        if cleared is not None and now - cleared < timedelta(hours=CLEARED_SHOWN_HOURS):
+            out["cleared_at"] = freshness.iso(cleared)
         if lightning is None or out["status"] == freshness.UNAVAILABLE:
             return out
         close = _dict(lightning.get("close")) or {}
@@ -285,6 +355,8 @@ class WeatherSource:
         if close.get("active") is True and last_close is not None and _num(close.get("hold_minutes")) is not None:
             hold_10 = last_close + timedelta(minutes=close["hold_minutes"])
         per_minute = _num(close.get("strikes_last_minute"))
+        # After the operator's Clear, close strikes from before it no longer count.
+        old_close = cleared is not None and (last_close is None or last_close <= cleared)
         out.update({
             "closest_mi": _num(lightning.get("closest_distance_mi")),
             "last_strike_at": freshness.iso(freshness.parse_time(lightning.get("most_recent_strike_at"))),
@@ -293,16 +365,18 @@ class WeatherSource:
         })
         if test:
             return out  # flags stay null: a simulated strike must not raise an alert
-        within_5 = self._hold_5mi_until is not None and now < self._hold_5mi_until
+        hold_until = self._state.hold_5mi_until
+        within_5 = hold_until is not None and now < hold_until
         out.update({
-            "within_10mi": _bool(close.get("active")),
+            "within_10mi": False if old_close and close.get("active") is True else _bool(close.get("active")),
             "within_5mi": within_5,
-            "frequent": None if per_minute is None else per_minute > self._t("lightning_frequent_per_min"),
-            "hold_until_10mi": freshness.iso(hold_10),
-            "hold_until_5mi": freshness.iso(self._hold_5mi_until) if within_5 else None,
-            # Extra field (not in contracts 0.3): when this 5-mile hold began, so the
-            # alert list can flash once per hold and key Acknowledge on it.
-            "hold_since_5mi": freshness.iso(self._hold_5mi_since) if within_5 else None,
+            "frequent": (None if per_minute is None
+                         else (not old_close) and per_minute > self._t("lightning_frequent_per_min")),
+            "hold_until_10mi": None if old_close else freshness.iso(hold_10),
+            "hold_until_5mi": freshness.iso(hold_until) if within_5 else None,
+            # When this 5-mile hold began (contracts 0.4), so the alert list can
+            # flash once per hold and key Acknowledge on it.
+            "hold_since_5mi": freshness.iso(self._state.hold_5mi_since) if within_5 else None,
         })
         return out
 

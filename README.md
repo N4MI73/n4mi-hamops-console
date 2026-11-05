@@ -7,7 +7,7 @@ A portable Raspberry Pi 5 touchscreen operations console for amateur radio. It p
 
 Both modes are the same dashboard reading the same JSON from a small service on the Pi; only that service's data sources change.
 
-> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the first steps of the console service (propagation relay, home weather relay, NWS forecast, alert ranking, the settings API and Pi status, with a plain check page).
+> **Status (November 2026): early development.** The hardware is built and the design is settled, but there is no dashboard yet. What's here so far: the kiosk display setup, a touch test page, the example settings file, and the console service (propagation relay, home weather relay, NWS forecast, alert ranking, the settings API and Pi status, with a plain check page).
 
 ## How it works
 
@@ -33,7 +33,7 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 | `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium) and the service's systemd unit. See `pi/README.md` |
 | `config/` | `settings.example.json`, the template for the console's settings |
 | `diagnostics/` | Small standalone test tools, e.g. `kiosk-test.html` for checking screen rotation and touch |
-| `docs/` | Reference documents (the JSON contracts will go here) |
+| `docs/` | Reference documents, including the JSON contracts (`docs/contracts.md`) |
 
 ## Hardware
 

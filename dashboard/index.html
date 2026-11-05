@@ -133,9 +133,11 @@ async function refresh() {
       wa.items.length ? wa.items.map(i => i.event).join(", ") : "None in effect";
     document.getElementById("w-cond").textContent = wc.status === "unavailable" ? "--" :
       `${dash(wc.temperature_f)} °F · ${dash(wc.humidity_pct)} % · ${dash(wc.wind_dir)} ${dash(wc.wind_mph)} mph`;
-    document.getElementById("w-light").textContent = !wl ? "--" :
+    const clearedNote = wl && wl.cleared_at && !wl.within_5mi && !wl.within_10mi
+      ? ` · cleared by operator ${new Date(wl.cleared_at).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}` : "";
+    document.getElementById("w-light").textContent = (!wl ? "--" :
       wl.within_5mi ? `WITHIN 5 MI (${dash(wl.closest_mi)} mi)` : wl.within_10mi ? `Within 10 mi (${dash(wl.closest_mi)} mi)` :
-      wl.within_10mi === false ? `None close · ${dash(wl.strikes_recent)} in ${dash(wl.window_min)} min` : "--";
+      wl.within_10mi === false ? `None close · ${dash(wl.strikes_recent)} in ${dash(wl.window_min)} min` : "--") + clearedNote;
     document.getElementById("w-msg").textContent = [wa, wc, wl, wf].filter(b => b && b.message).map(b => b.message)
       .filter((m, i, all) => all.indexOf(m) === i).join(" · ");
 
@@ -144,6 +146,7 @@ async function refresh() {
     document.getElementById("alerts").innerHTML = items.slice(0, 3).map(i =>
       `<li class="${i.color}"><b>${esc(i.title)}</b><span>${esc(i.detail)}</span>` +
       (i.critical && !i.acknowledged ? `<button data-id="${esc(i.ref.id)}">Acknowledge</button>` : "") +
+      (i.ref.block === "weather.lightning" ? `<button data-clear="1">Clear hold</button>` : "") +
       `<em>${i.tier === "badge" ? "badge" : i.critical ? (i.acknowledged ? "critical · ack'd" : "CRITICAL") : ""}</em></li>`).join("") +
       (items.length > 3 ? `<li><span>+ ${items.length - 3} more</span></li>` : "");
 
@@ -169,7 +172,16 @@ async function refresh() {
   }
 }
 document.getElementById("alerts").addEventListener("click", async e => {
-  const id = e.target.dataset && e.target.dataset.id;
+  const t = e.target;
+  if (t.dataset && t.dataset.clear) {
+    // Two steps, so a stray touch can't end a lightning hold.
+    if (t.dataset.clear === "1") { t.dataset.clear = "2"; t.textContent = "Confirm clear"; return; }
+    t.disabled = true;
+    await fetch("/api/alerts/clear-hold", {method: "POST"});
+    refresh();
+    return;
+  }
+  const id = t.dataset && t.dataset.id;
   if (!id) return;
   e.target.disabled = true;
   await fetch("/api/alerts/ack", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({id})});

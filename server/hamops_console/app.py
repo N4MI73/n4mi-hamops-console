@@ -1,8 +1,8 @@
 """The console service: serves the dashboard page and the JSON API.
 
 Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather, /api/alerts,
-/api/system, POST /api/alerts/ack, and GET/PUT /api/settings with
-POST /api/settings/test.
+/api/system, POST /api/alerts/ack and /api/alerts/clear-hold, and
+GET/PUT /api/settings with POST /api/settings/test.
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -74,6 +74,16 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, dashboa
             return jsonify({"error": "no current alert with that id"}), 404
         acks.add(alert_id)
         return jsonify({"acknowledged": alert_id})
+
+    @app.post("/api/alerts/clear-hold")
+    def api_alerts_clear_hold():
+        """The operator's Clear for the lightning holds, until the next strike.
+        Allowed only while a lightning item is in the list; the dashboard asks
+        for confirmation first. Nothing is sent to Weather Sentinel."""
+        lightning = {"lightning_5mi", "lightning_frequent", "lightning_10mi"}
+        if not any(i["category"] in lightning for i in ranked()):
+            return jsonify({"error": "No lightning hold to clear"}), 409
+        return jsonify({"cleared_at": freshness.iso(weather.clear_hold())})
 
     @app.get("/api/settings")
     def api_settings():
