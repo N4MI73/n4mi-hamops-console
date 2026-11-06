@@ -15,6 +15,7 @@ find_worst_alert() lesson). Order approved 2026-10-12, extended by Dan
      7 lightning_10mi            strike inside 10 mi                  yellow
      8 lightning_outlook         lightning possible, or likely later  yellow
      9 source_down               a source stale, unavailable or in test mode           yellow
+                                 (NWS alerts first among these, 2026-11-05)
     10 propagation               notable propagation                  green (good) / yellow (bad)
     11 all_quiet                 nothing else on the card             green
   badge tier (counted on the Alerts button)
@@ -152,8 +153,16 @@ def _alerts_unavailable_storms(alerts, forecast, now, hours):
                   None, "weather.alerts", "alerts-unavailable-storms", "red")]
 
 
+NWS_ALERTS_SOURCE_ID = "source-nws-alerts"
+
+
 def _source_down(blocks):
-    """One item per source that is stale, unavailable or in test mode."""
+    """One item per source that is stale, unavailable or in test mode.
+
+    The NWS alerts block gets its own wording ("NWS alerts unavailable") and is
+    ranked first among these cards (Dan, 2026-11-05): of all the things that can
+    be down, not knowing about warnings matters most. Other blocks from the same
+    source fold into it, as before, so one outage still gives one card."""
     by_source = {}
     for name, block in blocks:
         if not block or block.get("status") == freshness.OK:
@@ -161,14 +170,21 @@ def _source_down(blocks):
         by_source.setdefault(block.get("source") or name, (name, block))
     out = []
     for source, (name, block) in by_source.items():
-        if block["status"] == freshness.TEST:
+        status, message, id_ = block["status"], block.get("message"), f"source-{source}"
+        if status == freshness.TEST:
             title = "Home weather station in test mode"
-        elif block["status"] == freshness.STALE:
+        elif name == "weather.alerts":
+            title = "NWS alerts out of date" if status == freshness.STALE else "NWS alerts unavailable"
+            message = _join(message + "." if message and not message.endswith(".") else message,
+                            "Not the same as no alerts.")
+        elif status == freshness.STALE:
             title = f"{source} data is stale"
         else:
             title = f"{source} unavailable"
-        out.append(_item("source_down", title, block.get("message"), block.get("fetched_at"),
-                         name, f"source-{source}", "yellow"))
+        if name == "weather.alerts":
+            id_ = NWS_ALERTS_SOURCE_ID
+        out.append(_item("source_down", title, message, block.get("fetched_at"),
+                         name, id_, "yellow"))
     return out
 
 
@@ -216,7 +232,8 @@ def build(propagation, weather, settings, now, acks=None):
 
     # Category order, then newest first within a category (no time sorts last).
     items.sort(key=lambda i: i["since"] or "", reverse=True)
-    items.sort(key=lambda i: ORDER.index(i["category"]))
+    # Among the data-source cards, an NWS-alerts outage comes first (Dan, 2026-11-05).
+    items.sort(key=lambda i: (ORDER.index(i["category"]), i["ref"]["id"] != NWS_ALERTS_SOURCE_ID))
     acks = acks or {}
     for rank, item in enumerate(items, start=1):
         item["rank"] = rank

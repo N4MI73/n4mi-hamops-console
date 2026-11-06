@@ -145,6 +145,11 @@ button:disabled { cursor: default; }
 .big-temp span:last-child { font-size: 19px; color: var(--ink-2); }
 .facts { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 6px; font-size: 20px; }
 .facts dt { color: var(--muted); } .facts dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The forecast can be long ("Slight Chance Showers And Thunderstorms"): up to two lines, then an ellipsis. */
+.facts dd.wrap { white-space: normal; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+/* A two-line forecast plus a two-line lightning line must still fit the Weather tile at 720 px:
+   drop the list's browser-default margins there (checked in a browser 2026-11-05). */
+#t-wx .facts { margin: 4px 0 0; }
 .lines { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
 .line { display: flex; align-items: center; gap: 10px; font-size: 19px; }
 .sources-label { font-size: 16px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); margin-top: auto; }

@@ -10,7 +10,8 @@
 "use strict";
 
 const POLL_MS = 15000;
-const IDLE_BACK_TO_TOP_MS = 30000;     // Priority Card returns to the worst item (approved)
+const IDLE_BACK_TO_TOP_MS = 30000;     // after a touch, the card returns to the worst item (approved)
+const ROTATE_MS = 60000;               // with nothing critical, the card moves on every 60 s (Dan, 2026-11-05)
 const FLASH_MAX_MS = 2 * 60 * 1000;    // a critical item flashes for at most 2 minutes (approved)
 
 const state = {
@@ -18,7 +19,9 @@ const state = {
   receivedAt: 0,         // Date.now() when the replies arrived (for ticking ages)
   index: 0,              // Priority Card page
   topId: null,           // id of the worst card item last time
-  lastTouch: 0,
+  shownId: null,         // id of the item on the card, so a new list keeps it in view
+  shownSince: 0,         // when the card last changed page (for the 60 s rotation)
+  lastTouch: 0,          // last touch of < > or Clear; 0 = no touch pending
   firstSeen: {},         // critical item id -> when this screen first showed it
   badgeIds: null,        // badge item ids last time (null until the first poll)
   clearArmed: 0,         // Clear hold: first tap arms (time), second confirms within 10 s
@@ -139,15 +142,29 @@ function renderPriority() {
   const card = $("priority");
   if (!cards.length) return;    // the service always sends at least all_quiet
 
-  // A new worst item jumps to the front; after 30 s untouched, back to the worst.
-  if (cards[0].ref.id !== state.topId) { state.index = 0; state.topId = cards[0].ref.id; }
-  if (Date.now() - state.lastTouch > IDLE_BACK_TO_TOP_MS) state.index = 0;
-  if (state.index >= cards.length) state.index = 0;
+  // Which page to show (rules approved 2026-10-12, rotation added 2026-11-05):
+  //  - a new worst item jumps to the front;
+  //  - a critical item (always ranked first) pins the card: no rotation, even after Acknowledge;
+  //  - otherwise the card moves to the next item every 60 s, wrapping round;
+  //  - touching < > pauses that; 30 s after the last touch the card goes back to the worst
+  //    item and rotation carries on from there. One item (or "All quiet.") never rotates.
+  const t = Date.now();
+  const n = cards.length;
+  const go = i => { state.index = i; state.shownSince = t; };
+  if (cards[0].ref.id !== state.topId) { state.topId = cards[0].ref.id; go(0); }
+  else {
+    const at = cards.findIndex(c => c.ref.id === state.shownId);   // the list may have changed
+    if (at >= 0) state.index = at;
+    else go(state.index < n ? state.index : 0);                   // its item ended: fresh 60 s
+  }
+  if (state.lastTouch && t - state.lastTouch > IDLE_BACK_TO_TOP_MS) { state.lastTouch = 0; go(0); }
+  const pinned = cards[0].critical;
+  if (!state.lastTouch && !pinned && n > 1 && t - state.shownSince >= ROTATE_MS) go((state.index + 1) % n);
   const item = cards[state.index];
+  state.shownId = item.ref.id;
 
-  const now = Date.now();
-  for (const c of cards) if (c.critical && !(c.ref.id in state.firstSeen)) state.firstSeen[c.ref.id] = now;
-  const flashing = item.critical && !item.acknowledged && now - state.firstSeen[item.ref.id] < FLASH_MAX_MS;
+  for (const c of cards) if (c.critical && !(c.ref.id in state.firstSeen)) state.firstSeen[c.ref.id] = t;
+  const flashing = item.critical && !item.acknowledged && t - state.firstSeen[item.ref.id] < FLASH_MAX_MS;
 
   const quiet = item.category === "all_quiet";
   card.className = "priority " + (item.color || "green") + (flashing ? " flash" : "")
@@ -178,7 +195,7 @@ function renderPriority() {
   const clear = $("p-clear");
   const lightning = item.ref.block === "weather.lightning";
   clear.hidden = !lightning;
-  if (!lightning || Date.now() - state.clearArmed > 10000) state.clearArmed = 0;
+  if (!lightning || t - state.clearArmed > 10000) state.clearArmed = 0;
   clear.textContent = state.clearArmed ? "Confirm clear" : "Clear hold";
   clear.classList.toggle("armed", !!state.clearArmed);
 
@@ -399,12 +416,16 @@ async function poll() {
   }
 }
 
-$("p-prev").addEventListener("click", () => {
-  const n = cardItems().length; state.index = (state.index - 1 + n) % n; touched();
-});
-$("p-next").addEventListener("click", () => {
-  const n = cardItems().length; state.index = (state.index + 1) % n; touched();
-});
+$("p-prev").addEventListener("click", () => page(-1));
+$("p-next").addEventListener("click", () => page(1));
+function page(step) {
+  const cards = cardItems(), n = cards.length;
+  if (!n) return;
+  state.index = (state.index + step + n) % n;
+  state.shownId = cards[state.index].ref.id;
+  state.shownSince = Date.now();
+  touched();
+}
 $("p-ack").addEventListener("click", async e => {
   e.target.disabled = true;
   try {

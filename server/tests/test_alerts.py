@@ -205,7 +205,31 @@ class Sources(unittest.TestCase):
         w["alerts"]["items"] = []
         w["forecast"]["status"] = "unavailable"
         titles = [i["title"] for i in build(w=w)]
-        self.assertEqual(sorted(titles), ["NWS unavailable", "Weather Sentinel unavailable"])
+        # Sentinel's three blocks give one card, worded for the alerts and ranked first.
+        self.assertEqual(titles, ["NWS alerts unavailable", "NWS unavailable"])
+
+    def test_nws_alerts_outage_first_among_sources(self):
+        # PropMon fetched more recently than the alerts, so "newest first" alone would put
+        # PropMon first; the NWS-alerts card must still lead (Dan, 2026-11-05).
+        w = weather(alerts_status="stale")
+        w["alerts"].update(fetched_at="2026-11-01T14:30:00Z", message="Weather Sentinel can't reach NWS")
+        p = prop(status="stale")
+        p["fetched_at"] = "2026-11-01T14:50:00Z"
+        items = build(p=p, w=w)
+        self.assertEqual(cats(items), ["source_down", "source_down"])
+        first = items[0]
+        self.assertEqual(first["title"], "NWS alerts out of date")
+        self.assertEqual(first["detail"], "Weather Sentinel can't reach NWS. Not the same as no alerts.")
+        self.assertEqual(first["ref"], {"block": "weather.alerts", "id": alerts.NWS_ALERTS_SOURCE_ID})
+        self.assertEqual(items[1]["title"], "PropMon data is stale")
+
+    def test_other_sentinel_blocks_keep_their_wording(self):
+        # Alerts fine, Tempest stale: still "Weather Sentinel", not "NWS alerts".
+        w = weather()
+        w["conditions"]["status"] = "stale"
+        items = build(w=w)
+        self.assertEqual([i["title"] for i in items], ["Weather Sentinel data is stale"])
+        self.assertEqual(items[0]["ref"]["id"], "source-Weather Sentinel")
 
 
 class Badge(unittest.TestCase):

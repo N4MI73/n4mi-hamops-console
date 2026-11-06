@@ -352,6 +352,7 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
 ```
 
 - The Priority Card shows the first `card` item, with ‹ › and "1 of N" across the other card items. The Alerts page lists everything, card and badge items alike.
+- **Rotation (changed 5 November 2026; replaces "no auto-scroll"):** with no critical item in the list, the card moves to the next card item every 60 seconds and wraps round. A critical item (always ranked first) pins the card on it until it ends, even after Acknowledge; with two, it stays on the worse one. ‹ › still page; touching them pauses rotation, and 30 seconds after the last touch the card returns to the first item and rotation carries on. A single item, or "All quiet.", never rotates. A new first item jumps to the front. This is screen behaviour; the service's ranking is unchanged by it.
 - **`tier`**: `card` items go on the Priority Card. `badge` items are counted on a small badge on the Alerts button, coloured by the worst one; the badge blinks for about 10 seconds when a new item arrives, then stays steady until the Alerts page is opened.
 - **`critical`**: flash the border (about once a second) and show Acknowledge. Flashing stops when acknowledged or after 2 minutes; the item stays on top until it ends.
 - **The list is never empty.** When nothing is wrong it holds one `all_quiet` card ("All quiet.", with "20m is open." or similar when bands are good). `all_quiet` can appear alongside badge items.
@@ -369,7 +370,7 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
 | 6 | `lightning_frequent` | `frequent` (Home) | yellow | card | no |
 | 7 | `lightning_10mi` | `within_10mi` (Home) | yellow | card | no |
 | 8 | `lightning_outlook` | `lightning_outlook` possible, or likely more than 2 h out | yellow | card | no |
-| 9 | `source_down` | A source stale, unavailable, **or in test mode** (one item per source) | yellow | card | no |
+| 9 | `source_down` | A source stale, unavailable, **or in test mode** (one item per source). **The NWS alerts card comes first among these** (5 November 2026) | yellow | card | no |
 | 10 | `propagation` | Notable propagation (below) | green (good) / yellow (bad) | card | no |
 | 11 | `all_quiet` | No other card item | green | card | no |
 | — | `temperature_alert` | Any NWS product with `hazard_class` = `temperature` | yellow | badge | no |
@@ -378,6 +379,7 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
 
 - **One detected-lightning item at a time:** the highest that applies (5 mi beats frequent beats 10 mi). Lightning data is used only when its block is `ok`. One forecast-lightning item can appear as well.
 - **Stale NWS alerts are still ranked**, beside a `source_down` card saying the alerts are stale. After 30 minutes they're unavailable and drop out.
+- **NWS alerts outage (5 November 2026).** When the `alerts` block is stale or unavailable, its `source_down` card is titled "NWS alerts out of date" or "NWS alerts unavailable" (not the source's name, since in Home Mode Sentinel may be answering while it can't reach NWS), its detail is the block's `message` followed by "Not the same as no alerts.", its `ref.id` is `source-nws-alerts`, and it comes before the other `source_down` cards whatever their `since`. Other blocks from the same source fold into that one card, as before.
 - **Sentinel test mode** shows as a `source_down` card titled "Home weather station in test mode". Otherwise the card could read "All quiet." while real alerts can't pass through.
 - **Notable propagation** is judged only when the propagation block is `ok`. Bad (yellow): K-index of `prop_bad_k_index` (5) or higher, or an X-ray flare of a class in `prop_bad_xray_classes` (M, X). Good (green): `prop_good_min_bands` (2) or more bands rated good. All tunable in Settings.
 
@@ -508,6 +510,7 @@ Until Phase 3, in Field Mode the alerts and conditions blocks are `unavailable` 
 - Contracts approved for building (this version).
 - The lightning holds survive a restart, and the operator can clear them until the next strike (§5, §6).
 - Sentinel test mode stays a yellow Priority Card item.
+- Priority Card rotation every 60 s unless a critical item pins it, and an NWS-alerts outage first among the data-source cards, worded as such (§6; built the same evening).
 - Economy mode in Phase 3 (§2).
 - **Settings names:** "Data source: Home / Field" (the mode in these contracts) and **"Operating profile: General HF / Field Day"**, kept separate so Field Mode isn't confused with Field Day.
 
