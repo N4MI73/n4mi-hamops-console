@@ -210,6 +210,7 @@ function renderHours() {
   const cells = [];
   const row = (name, make) => { cells.push(el("span", "rowname", name)); for (const h of hours) cells.push(make(h)); };
   row("Hour", h => el("span", "cell hr", hourLabel(h.time)));
+  row("Temp °F", h => el("span", "cell tmp", h.temperature_f === null ? "--" : `${h.temperature_f}°`));
   row("Lightning", h => el("span", "cell lt " + (h.lightning || ""),
     h.lightning === "likely" ? "LIKELY" : h.lightning === "possible" ? "POSSIBLE" : "–"));
   row("Rain", h => el("span", "cell", h.rain_chance_pct === null ? "--" : `${h.rain_chance_pct}%`));
