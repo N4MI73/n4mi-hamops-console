@@ -1,0 +1,42 @@
+/* Ham Ops Console -- Propagation page (approved mockup "Propagation page", 2026-10-12).
+   Uses home.css for the shared parts (fonts, colours, status bar, module row, tiles,
+   toolbar). Text stays at 16 px or larger, as on the Home screen. */
+
+.pr-body { flex-grow: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 10px; }
+
+/* -- Band conditions: ten cells, good -> fair -> poor (the service sends them in order) */
+.pr-bands { gap: 14px; }
+.best { font-size: 26px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.band-grid {
+  flex-grow: 1; min-height: 0; display: grid; gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+.cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: var(--ground); border: 2px solid var(--panel-line); border-radius: 10px;
+}
+.cell b { font-family: "Barlow Condensed", sans-serif; font-size: 36px; font-weight: 600; }
+.cell span { font-size: 18px; font-weight: 700; letter-spacing: 0.08em; color: var(--grey); }
+.cell.good { border-color: var(--good-line); } .cell.good span { color: var(--good); }
+.cell.fair { border-color: #6E5520; } .cell.fair span { color: var(--fair); }
+.band-msg {
+  grid-column: 1 / -1; grid-row: 1 / -1; display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: var(--muted); text-align: center;
+}
+/* Stale: the last good ratings stay, without their colour (as on the Home screen). */
+.pr-bands.is-stale .cell { border-color: var(--panel-line); }
+.pr-bands.is-stale .cell span, .pr-bands.is-stale .best { color: var(--grey); }
+
+/* -- Solar and geomagnetic */
+.pr-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.pr-solar { flex-grow: 1; }
+.solar { display: grid; grid-template-columns: auto minmax(0, 1fr); row-gap: 10px; column-gap: 12px; align-items: baseline; margin: 0; font-size: 20px; }
+.solar dt { color: var(--muted); }
+.solar dd { margin: 0; font-weight: 600; text-align: right; }
+.solar dd.fair { color: var(--fair-label); }
+.pr-solar.is-stale .solar dd { color: var(--grey); }
+.muf {
+  height: 72px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+  font-size: 22px; font-weight: 600; color: var(--dim); background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
+}
+.muf .soon { display: inline; font-size: 17px; }
