@@ -37,7 +37,7 @@ DEFAULTS = {
         "sentinel_url": "",
     },
     "thresholds": {
-        "propagation_stale_min": 30,
+        "propagation_stale_min": 15,
         "propagation_fetch_min": 5,
         "sentinel_fetch_min": 1,
         "nws_alerts_stale_min": 10,

@@ -167,10 +167,19 @@ class Connections(unittest.TestCase):
         results = settings_api.test_connections(settings, {"sentinel_url": "http://other.example:8085/"},
                                                 fetch=fake)
         self.assertEqual([r["source"] for r in results], ["PropMon", "Weather Sentinel", "NWS"])
-        self.assertEqual(seen[0][1], "http://propmon.example:8076/api/instrument/propagation")
+        self.assertEqual(seen[0][1], "http://propmon.example:8076/api/v2/conditions")
         self.assertEqual(seen[1][1], "http://other.example:8085/api/conditions")   # unsaved address
         self.assertEqual(seen[2][1], "https://api.weather.gov/alerts/active/count")
         self.assertTrue(seen[2][2].endswith("(n0call@example.com)"))
+
+    def test_503_counts_as_answering(self):
+        import urllib.error
+        from unittest import mock
+        err = urllib.error.HTTPError("http://propmon.example:8076/api/v2/conditions", 503, "x", {}, None)
+        with mock.patch.object(settings_api.urllib.request, "urlopen", side_effect=err):
+            r = settings_api._try("PropMon", "http://propmon.example:8076/api/v2/conditions", {}, 1)
+        self.assertTrue(r["ok"])
+        self.assertIn("no data yet", r["message"])
 
     def test_not_set_and_invalid(self):
         _, settings = setup_file()

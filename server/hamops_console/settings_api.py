@@ -272,7 +272,11 @@ def _try(name, url, headers, timeout):
             json.load(reply)
         ok, message = True, None
     except urllib.error.HTTPError as e:
-        ok, message = False, f"answered with an error ({e.code})"
+        if e.code == 503:
+            # PropMon v2 answers 503 `no_data_yet` for a short while after a restart.
+            ok, message = True, "answering, but no data yet (just restarted?)"
+        else:
+            ok, message = False, f"answered with an error ({e.code})"
     except (urllib.error.URLError, OSError) as e:
         ok, message = False, f"not answering ({e.__class__.__name__})"
     except ValueError:
@@ -287,7 +291,7 @@ def test_connections(settings, sources=None, fetch=_try, timeout=5):
     use = dict(settings["sources"], **(sources or {}))
     contact = settings.get("nws_user_agent_contact")
     json_headers = {"Accept": "application/json", "User-Agent": "HamOpsConsole"}
-    plan = [("PropMon", use.get("propmon_url"), "/api/instrument/propagation", json_headers),
+    plan = [("PropMon", use.get("propmon_url"), "/api/v2/conditions", json_headers),
             ("Weather Sentinel", use.get("sentinel_url"), "/api/conditions", json_headers),
             # NWS's home page is HTML, not JSON (found on the Pi, 2026-11-03), so test a
             # small JSON endpoint instead: the national count of active alerts.

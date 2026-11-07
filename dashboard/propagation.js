@@ -34,6 +34,22 @@ function thresholds() {
           xray: Array.isArray(t.prop_bad_xray_classes) ? t.prop_bad_xray_classes : ["M", "X"]};
 }
 
+/* PropMon's `period`: the time of day where it rates (40m-6m; 160m and 80m switch
+   only day/night). */
+const PERIOD_WORDS = {dawn: "DAWN", day: "DAYTIME", dusk: "DUSK", night: "NIGHT"};
+
+/* PropMon rates for the home station's location (its own sun times), so the footnote
+   names the home grid square, 4 characters (the 6-character grid stays private). */
+function ratingsNote(p) {
+  const st = (((state.data.settings || {}).station) || {}).home || {};
+  const square = typeof st.grid === "string" && /^[A-R]{2}\d{2}/i.test(st.grid)
+    ? st.grid.slice(0, 2).toUpperCase() + st.grid.slice(2, 4) : null;
+  if (p && p.ratings_available === false)
+    return "PropMon can't reach HamQSL just now, so it isn't rating bands. Figures from NOAA.";
+  return square ? `Ratings for ${square} from solar flux, K index and time of day`
+                : "Band ratings from PropMon: solar flux, K index and time of day";
+}
+
 function list(names) {
   return names.length < 2 ? names.join("") : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
 }
@@ -54,9 +70,21 @@ function renderBands() {
   $("t-bands").classList.toggle("is-stale", !!p && p.status === "stale");
   const grid = $("band-grid");
   const bands = show ? (p.bands || []) : [];
+  const period = show && PERIOD_WORDS[p.period];
+  $("bands-title").textContent = "BAND CONDITIONS · NOW" + (period ? " · " + period : "");
+  $("bands-note").textContent = ratingsNote(show ? p : null);
   if (!bands.length) {
     $("best").textContent = "Band conditions not available";
     grid.replaceChildren(el("div", "band-msg", (p && p.message) || "No data from PropMon yet"));
+    return;
+  }
+  if (p.ratings_available === false) {
+    $("best").textContent = "Band ratings unavailable";
+    grid.replaceChildren(...bands.map(b => {
+      const cell = el("div", "cell");
+      cell.append(el("b", "", b.band), el("span", "", "--"));
+      return cell;
+    }));
     return;
   }
   const good = bands.filter(b => b.rating === "good").map(b => b.band);
@@ -87,8 +115,14 @@ function renderSolar() {
      !!v.xray && t.xray.includes(v.xray.charAt(0).toUpperCase())],
     ["Solar wind", typeof v.solar_wind_kms === "number" ? `${Math.round(v.solar_wind_kms)} km/s` : "--"],
   ];
+  /* After a storm (any 3-hour Kp of 5 or more) PropMon holds ratings down for 12 hours,
+     so poor bands then are expected, not a fault (Ham Shack Automation, 2026-11-07). */
+
   $("solar").replaceChildren(...rows.flatMap(([name, value, disturbed]) =>
     [el("dt", "", name), el("dd", disturbed ? "fair" : "", value)]));
+  const rec = $("recovery");
+  rec.hidden = !(v.recovery_active === true && v.recovery_ends);
+  rec.textContent = rec.hidden ? "" : `Storm recovery: PropMon holds ratings down until ${clockPair(v.recovery_ends)}.`;
 }
 
 function renderAll() {

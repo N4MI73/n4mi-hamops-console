@@ -35,6 +35,9 @@
 .solar dd { margin: 0; font-weight: 600; text-align: right; }
 .solar dd.fair { color: var(--fair-label); }
 .pr-solar.is-stale .solar dd { color: var(--grey); }
+/* After a storm PropMon holds ratings down for 12 hours; say so, so poor bands don't look like a fault. */
+.recovery { margin: 4px 0 0; font-size: 18px; line-height: 1.3; color: var(--fair-label); }
+.pr-solar.is-stale .recovery { color: var(--grey); }
 .muf {
   height: 72px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
   font-size: 22px; font-weight: 600; color: var(--dim); background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;

@@ -19,7 +19,7 @@
   "server": {"host": "127.0.0.1", "port": 8090},
   "thresholds": {
     "propagation_fetch_min": 5,
-    "propagation_stale_min": 30,
+    "propagation_stale_min": 15,
     "sentinel_fetch_min": 1,
     "nws_alerts_stale_min": 10,
     "nws_alerts_unavailable_min": 30,

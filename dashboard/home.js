@@ -136,7 +136,11 @@ function renderPropagation() {
     cell.append(name, rating);
     return cell;
   }));
-  $("prop-extra").textContent = show
+  $("prop-extra").textContent = show && p.ratings_available === false
+    ? "Band ratings unavailable: PropMon can't reach HamQSL"
+    : show && p.recovery_active === true && p.recovery_ends
+    ? `Storm recovery until ${clockPair(p.recovery_ends)}`
+    : show
     ? `SSN ${dash(p.sunspots)} · Solar wind ${dash(round(p.solar_wind_kms))} km/s`
     : (p && p.message) || f.text;
 }

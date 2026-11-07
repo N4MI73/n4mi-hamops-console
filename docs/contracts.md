@@ -59,7 +59,7 @@ The rules, in order:
 
 | Block | Fetched every | Stale after | Unavailable after | Notes |
 |---|---|---|---|---|
-| Propagation | 5 min (`propagation_fetch_min`) | 30 min | — | Fetched only when asked, at most this often |
+| Propagation | 5 min (`propagation_fetch_min`) | 15 min (30 until 8 November 2026) | — | Fetched only when asked, at most this often; PropMon's own `updated` is the age |
 | NWS alerts, Home | with the Sentinel fetch, 1 min (`sentinel_fetch_min`) | 10 min | 30 min (`nws_alerts_unavailable_min`) | Aged by when Sentinel last reached NWS (`last_polled_at`), not by whether Sentinel answers |
 | NWS alerts, Field | 2 min | 10 min | 30 min | Phase 3 |
 | Local conditions, Home (Tempest) | 1 min | 5 min, or at once if Sentinel says `available: false` | — | |
@@ -127,6 +127,22 @@ Errors from `POST`/`PUT` endpoints are JSON: `{"error": "..."}` or, for settings
 - `rating` is `good`, `fair`, `poor`, or `null`. Poor shows grey, not red.
 - **Band order:** good, then fair, then poor, then unknown; within each, lowest frequency first. The service sends `bands` already in this order.
 - PropMon's `alerts[]` and `tower_status` are not used.
+
+**Changed 8 November 2026: PropMon v2.** PropMon's server is owned by Ham Shack Automation; at its owner's request and Dan's decision the console now reads **`GET <propmon_url>/api/v2/conditions`** (v1, `/api/instrument/propagation`, stays frozen for the ESP32 instrument and DXMon). v2 only gains fields; renames and removals are checked with this project first. Designed from the live reply of 7 November 2026 (a G1 storm). New fields in the block, all present in every reply:
+
+```json
+    "ratings_available": true,
+    "period": "dusk",
+    "recovery_active": true, "recovery_ends": "2026-11-08T06:00:00Z"
+```
+
+- **`ratings_available`:** `false` when PropMon is on its NOAA fallback (HamQSL unreachable: its `source` is `"noaa"` or its `summary` is `"Data unavailable"`). PropMon then rates every band poor whatever the real conditions, so the service sends every band's `rating` as `null` and `summary` as `null`, and the screens say "Band ratings unavailable"; the solar figures (from NOAA) are still shown. `null` when there's no data at all. A real all-poor state from HamQSL (e.g. a storm) keeps `true`.
+- **`period`:** `dawn`, `day`, `dusk`, `night` or `null` — the 40m–6m time of day where PropMon rates (sunrise/sunset ±1 hour for dawn/dusk). 160m and 80m switch only day/night, so they can differ. The Propagation page heading reads "BAND CONDITIONS · NOW · DAYTIME" (DAWN, DUSK, NIGHT).
+- **`recovery_active` / `recovery_ends`:** PropMon caps ratings for 12 hours after any 3-hour Kp of 5 or more. While active, the Propagation page says "Storm recovery: PropMon holds ratings down until 1:00 AM (06:00 UTC)." and the Home tile "Storm recovery until …", so poor bands after a storm don't look like a fault. `recovery_ends` is `null` unless `recovery_active` is `true`.
+- **Where the ratings apply:** PropMon rates with sun times for its own location (the home station). The Propagation page footnote reads "Ratings for FM18 from solar flux, K index and time of day", taking the 4-character square from the **home** station grid in Settings.
+- **Just after a PropMon restart** v2 answers HTTP 503 `{"error": "no_data_yet"}`: the block says "PropMon has just restarted and has no data yet" (unavailable until the first good reply, or the last good data keeps ageing). Test connections reports a 503 as answering.
+- **Stale after 15 minutes** (three missed PropMon fetches; PropMon's own limit is 30), from PropMon's `updated`.
+- Read from v2: `bands[].band`, `bands[].status`, `period`, `source`, `summary`, `updated`, `solar.sfi`, `solar.sunspots`, `solar.a_index`, `solar.k_index`, `solar.xray`, `solar.solar_wind`, `geomagnetic.recovery_active`, `geomagnetic.recovery_ends`. Not used: `bands[].tod`, `tower`, `noaa_scales`, `sun`, `geomagnetic.kp_recent` / `penalty`, other `solar` fields. (Told to Ham Shack Automation, so PropMon changes can be checked against them.)
 
 ---
 
@@ -454,7 +470,7 @@ Everything the Settings screen may show and change. The service's listening addr
               "night_start": "22:00", "night_end": "07:00"},
   "sources": {"propmon_url": "http://propmon.example:8076", "sentinel_url": "http://sentinel.example:8085"},
   "thresholds": {
-    "propagation_stale_min": 30, "propagation_fetch_min": 5,
+    "propagation_stale_min": 15, "propagation_fetch_min": 5,
     "sentinel_fetch_min": 1, "nws_alerts_stale_min": 10, "nws_alerts_unavailable_min": 30,
     "conditions_stale_min": 5, "lightning_stale_min": 5, "station_obs_stale_min": 90,
     "forecast_fetch_min": 30, "forecast_stale_hours": 12,
@@ -487,7 +503,7 @@ Optional body `{"sources": {"propmon_url": "...", "sentinel_url": "..."}}` tests
 
 ```json
 {"results": [
-  {"source": "PropMon", "url": "http://propmon.example:8076/api/instrument/propagation", "ok": true, "ms": 25, "message": null},
+  {"source": "PropMon", "url": "http://propmon.example:8076/api/v2/conditions", "ok": true, "ms": 25, "message": null},
   {"source": "Weather Sentinel", "url": "http://sentinel.example:8085/api/conditions", "ok": true, "ms": 7, "message": null},
   {"source": "NWS", "url": "https://api.weather.gov/alerts/active/count", "ok": true, "ms": 450, "message": null}
 ]}

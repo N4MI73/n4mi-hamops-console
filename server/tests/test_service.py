@@ -24,16 +24,29 @@ from hamops_console import freshness, settings as settings_mod, system_info  # n
 from hamops_console.app import create_app  # noqa: E402
 from hamops_console.propagation import PropagationSource, translate  # noqa: E402
 
+# PropMon v2 (`/api/v2/conditions`), shaped like the live reply of 2026-11-07
+# (tower block trimmed; the console doesn't read it).
 PROPMON_SAMPLE = {
-    "a_index": 19, "alerts": [{"category": "tower", "level": "NONE", "message": "No active alerts"}],
-    "bands": [{"band": "160m", "status": "poor"}, {"band": "80m", "status": "poor"},
-              {"band": "40m", "status": "poor"}, {"band": "30m", "status": "fair"},
-              {"band": "20m", "status": "fair"}, {"band": "17m", "status": "fair"},
-              {"band": "15m", "status": "poor"}, {"band": "12m", "status": "poor"},
-              {"band": "10m", "status": "poor"}, {"band": "6m", "status": "poor"}],
-    "k_index": 1, "sfi": 95, "solar_wind": 393.9, "summary": "FAIR: 30m 20m 17m", "sunspots": 37,
-    "tower_status": "NONE", "updated": "2026-11-02T20:11:06Z", "xray": "B4.3",
+    "version": 2, "source": "hamqsl", "period": "day", "summary": "FAIR: 30m 20m 17m",
+    "updated": "2026-11-02T20:11:06Z",
+    "bands": [{"band": "160m", "status": "poor", "tod": "day"}, {"band": "80m", "status": "poor", "tod": "day"},
+              {"band": "40m", "status": "poor", "tod": "day"}, {"band": "30m", "status": "fair", "tod": "day"},
+              {"band": "20m", "status": "fair", "tod": "day"}, {"band": "17m", "status": "fair", "tod": "day"},
+              {"band": "15m", "status": "poor", "tod": "day"}, {"band": "12m", "status": "poor", "tod": "day"},
+              {"band": "10m", "status": "poor", "tod": "day"}, {"band": "6m", "status": "poor", "tod": "day"}],
+    "solar": {"a_index": 19, "k_index": 1, "sfi": 95, "solar_wind": 393.9, "sunspots": 37, "xray": "B4.3",
+              "bz": 1.2, "hamqsl_updated": "02 Nov 2026 2000 GMT"},
+    "geomagnetic": {"penalty": 1.0, "recovery_active": False, "recovery_ends": None},
+    "tower": {"status": "NONE", "wind_gust_mph": 0.0},
 }
+# The live 2026-11-07 storm reply: K 5, every band poor from HamQSL (real), recovery on.
+PROPMON_STORM = dict(
+    PROPMON_SAMPLE, period="dusk", summary="POOR: all bands", updated="2026-11-07T22:40:53Z",
+    bands=[{"band": b, "status": "poor", "tod": "dusk"} for b in
+           ("160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m")],
+    solar={"a_index": 23, "k_index": 5, "sfi": 127, "solar_wind": 684.5, "sunspots": 93, "xray": "C5.3"},
+    geomagnetic={"penalty": 0.45, "recovery_active": True, "recovery_ends": "2026-11-08T06:00:00Z"},
+)
 T0 = datetime(2026, 11, 2, 20, 12, 0, tzinfo=timezone.utc)
 
 
@@ -57,7 +70,7 @@ class Settings(unittest.TestCase):
         s = settings_mod.load(os.path.join(tempfile.mkdtemp(), "nope.json"))
         self.assertEqual(s["mode"], "home")
         self.assertEqual(s["server"]["host"], "127.0.0.1")
-        self.assertEqual(s["thresholds"]["propagation_stale_min"], 30)
+        self.assertEqual(s["thresholds"]["propagation_stale_min"], 15)
 
     def test_partial_file_overlays_defaults_and_skips_comments(self):
         path = os.path.join(tempfile.mkdtemp(), "settings.json")
@@ -124,22 +137,48 @@ class Propagation(unittest.TestCase):
         order = [(b["band"], b["rating"]) for b in d["bands"]]
         self.assertEqual(order[:3], [("30m", "fair"), ("20m", "fair"), ("17m", "fair")])
         self.assertEqual([b for b, _ in order[3:]], ["160m", "80m", "40m", "15m", "12m", "10m", "6m"])
-        self.assertNotIn("tower_status", d)
-        self.assertNotIn("alerts", d)
+        self.assertNotIn("tower", d)
+        self.assertEqual((d["period"], d["ratings_available"], d["recovery_active"]), ("day", True, False))
+        self.assertIsNone(d["recovery_ends"])
+
+    def test_storm_all_poor_is_real_with_recovery(self):
+        d = translate(PROPMON_STORM)
+        self.assertTrue(d["ratings_available"], "HamQSL-based all-poor is a real rating")
+        self.assertEqual({b["rating"] for b in d["bands"]}, {"poor"})
+        self.assertEqual((d["k_index"], d["period"]), (5, "dusk"))
+        self.assertEqual((d["recovery_active"], d["recovery_ends"]), (True, "2026-11-08T06:00:00Z"))
+        self.assertEqual(d["summary"], "POOR: all bands")
+
+    def test_noaa_fallback_means_ratings_unavailable(self):
+        for raw in (dict(PROPMON_SAMPLE, source="noaa"), dict(PROPMON_SAMPLE, summary="Data unavailable")):
+            d = translate(raw)
+            self.assertFalse(d["ratings_available"])
+            self.assertEqual({b["rating"] for b in d["bands"]}, {None}, "no band shown as poor")
+            self.assertEqual(len(d["bands"]), 10)
+            self.assertIsNone(d["summary"])
+            self.assertEqual(d["sfi"], 95, "solar figures still shown")
+
+    def test_odd_period_and_recovery_ignored(self):
+        d = translate(dict(PROPMON_SAMPLE, period="afternoon",
+                           geomagnetic={"recovery_active": "yes", "recovery_ends": "soon"}))
+        self.assertIsNone(d["period"])
+        self.assertIsNone(d["recovery_active"])
+        self.assertIsNone(d["recovery_ends"])
 
     def test_good_bands_come_first(self):
-        raw = {"bands": [{"band": "40m", "status": "poor"}, {"band": "17m", "status": "good"},
+        raw = {"source": "hamqsl", "bands": [{"band": "40m", "status": "poor"}, {"band": "17m", "status": "good"},
                          {"band": "20m", "status": "good"}, {"band": "15m", "status": "fair"},
                          {"band": "6m", "status": "weird"}]}
         self.assertEqual([b["band"] for b in translate(raw)["bands"]], ["20m", "17m", "15m", "40m", "6m"])
         self.assertIsNone(translate(raw)["bands"][-1]["rating"])
 
     def test_translate_survives_garbage(self):
-        d = translate({"sfi": "high", "k_index": True, "bands": [None, {"status": "good"}, "x"]})
+        d = translate({"solar": {"sfi": "high", "k_index": True}, "bands": [None, {"status": "good"}, "x"]})
         self.assertIsNone(d["sfi"])
         self.assertIsNone(d["k_index"])
         self.assertEqual(d["bands"], [])
         self.assertEqual(translate(None)["bands"], [])
+        self.assertIsNone(translate({"solar": "x", "geomagnetic": []})["sfi"])
 
     def test_source_fetches_lazily_and_keeps_last_good(self):
         calls = []
@@ -171,6 +210,42 @@ class Propagation(unittest.TestCase):
         b = src.block()
         self.assertEqual((b["status"], b["sfi"]), ("stale", 95))
         self.assertIn("not answering", b["message"])
+
+    def test_fresh_for_15_minutes(self):
+        clock = Clock(datetime(2026, 11, 2, 20, 11, 6, tzinfo=timezone.utc))
+        src = PropagationSource(make_settings(propmon_url="http://propmon:8076"),
+                                fetch=lambda base: PROPMON_SAMPLE, clock=clock)
+        clock.now += timedelta(minutes=14)
+        self.assertEqual(src.block()["status"], "ok")
+        clock.now += timedelta(minutes=2)
+        self.assertEqual(src.block()["status"], "stale", "PropMon's issue time is 16 min old")
+
+    def test_no_data_yet_after_propmon_restart(self):
+        from hamops_console.propagation import NoDataYet
+
+        def fetch(base):
+            raise NoDataYet()
+
+        b = PropagationSource(make_settings(propmon_url="http://propmon:8076"), fetch=fetch, clock=Clock(T0)).block()
+        self.assertEqual(b["status"], "unavailable")
+        self.assertIn("no data yet", b["message"])
+        self.assertIsNone(b["ratings_available"])
+
+    def test_fetch_turns_503_into_no_data_yet(self):
+        import urllib.error
+        import urllib.request
+        from unittest import mock
+        from hamops_console import propagation
+
+        err = urllib.error.HTTPError("http://propmon:8076/api/v2/conditions", 503, "Service Unavailable", {}, None)
+        with mock.patch.object(urllib.request, "urlopen", side_effect=err) as opened:
+            with self.assertRaises(propagation.NoDataYet):
+                propagation.fetch_propmon("http://propmon:8076/")
+        self.assertEqual(opened.call_args[0][0].full_url, "http://propmon:8076/api/v2/conditions")
+        err404 = urllib.error.HTTPError("x", 404, "Not Found", {}, None)
+        with mock.patch.object(urllib.request, "urlopen", side_effect=err404):
+            with self.assertRaises(urllib.error.HTTPError):
+                propagation.fetch_propmon("http://propmon:8076")
 
     def test_no_address_is_unavailable_with_reason(self):
         b = PropagationSource(make_settings(), fetch=lambda base: PROPMON_SAMPLE, clock=Clock(T0)).block()
