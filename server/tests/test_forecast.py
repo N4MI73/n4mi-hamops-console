@@ -260,6 +260,17 @@ class Block(unittest.TestCase):
         self.assertIsNone(marks["2026-11-05T11:00:00Z"])
         self.assertEqual(marks["2026-11-05T12:00:00Z"], "slight_chance")
         self.assertEqual(b["lightning_outlook"]["level"], "possible")
+        levels = {h["time"]: h["lightning"] for h in b["hourly"]}
+        self.assertIsNone(levels["2026-11-05T11:00:00Z"])
+        self.assertEqual(levels["2026-11-05T12:00:00Z"], "possible")
+
+    def test_lightning_level_words(self):
+        # Each hour's plain level uses the outlook's rule, so the page never reads coverage words.
+        self.assertIsNone(fc.lightning_level(None))
+        for word in ("likely", "numerous", "widespread", "definite"):
+            self.assertEqual(fc.lightning_level(word), "likely")
+        for word in ("slight_chance", "chance", "isolated", "scattered", "something_new"):
+            self.assertEqual(fc.lightning_level(word), "possible")
 
     def test_old_update_time_is_stale(self):
         source, nws, _ = make(now=datetime(2026, 11, 3, 6, 30, tzinfo=timezone.utc))

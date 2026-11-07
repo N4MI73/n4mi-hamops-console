@@ -6,10 +6,10 @@
 <title>Ham Ops Console</title>
 <link rel="stylesheet" href="/static/home.css">
 </head>
-<body>
+<body data-page="home">
 <!-- Ham Ops Console -- Home screen, built from the approved mockup (contracts 0.4).
-     All data comes from the console service on this Pi; see home.js. The service
-     check page that used to be here is at /check. -->
+     All data comes from the console service on this Pi; see common.js (shared by
+     every screen) and home.js. The service check page is at /check. -->
 <div class="screen">
 
   <header class="status-bar">
@@ -27,7 +27,7 @@
   <nav class="modules" aria-label="Modules">
     <button class="current" aria-current="page">Home</button>
     <button disabled>Propagation<span class="soon">Coming</span></button>
-    <button disabled>Weather<span class="soon">Coming</span></button>
+    <button data-href="/weather">Weather</button>
     <button disabled id="alerts-button">Alerts<span class="soon">Coming</span><span class="badge" id="badge" hidden></span></button>
     <button disabled>System<span class="soon">Coming</span></button>
   </nav>
@@ -104,6 +104,7 @@
 
 </div>
 <div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
+<script src="/static/common.js"></script>
 <script src="/static/home.js"></script>
 </body>
 </html>

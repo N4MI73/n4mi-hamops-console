@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>Ham Ops Console · Weather</title>
+<link rel="stylesheet" href="/static/home.css">
+<link rel="stylesheet" href="/static/weather.css">
+</head>
+<body data-page="weather">
+<!-- Ham Ops Console -- Weather page, built from the approved mockup "Weather page"
+     (2026-10-12, Field Mode). In Home Mode the Now panel shows the home Tempest and the
+     lightning line includes detection from Weather Sentinel. All data comes from the
+     console service on this Pi; see common.js and weather.js. -->
+<div class="screen">
+
+  <header class="status-bar">
+    <div class="clock"><span class="utc num" id="utc">--:--Z</span><span class="local" id="local">--</span></div>
+    <span class="mode-tag" id="mode">--</span>
+    <span class="station" id="station">--</span>
+    <div class="spacer"></div>
+    <div class="pills">
+      <span class="pill" id="pill-internet"><span class="dot"></span>Internet</span>
+      <span class="pill" id="pill-nas"><span class="dot"></span>NAS</span>
+      <span class="pill" id="pill-gps"><span class="dot"></span><span class="label">GPS</span></span>
+    </div>
+  </header>
+
+  <nav class="modules" aria-label="Modules">
+    <button data-href="/">Home</button>
+    <button disabled>Propagation<span class="soon">Coming</span></button>
+    <button class="current" aria-current="page">Weather</button>
+    <button disabled id="alerts-button">Alerts<span class="soon">Coming</span><span class="badge" id="badge" hidden></span></button>
+    <button disabled>System<span class="soon">Coming</span></button>
+  </nav>
+
+  <div class="wx-body">
+
+    <div class="wx-top">
+      <section class="tile wx-here" aria-label="NWS alerts and lightning">
+        <div class="tile-head"><span class="name">THIS LOCATION</span><span class="fresh" id="here-fresh">--</span></div>
+        <div class="state-row" id="row-lightning">
+          <span class="dot"></span><span class="what" id="lt-what">--</span><span class="note" id="lt-note"></span>
+        </div>
+        <div class="state-row" id="row-alerts">
+          <span class="dot"></span><span class="what" id="al-what">--</span><span class="note" id="al-note"></span>
+        </div>
+      </section>
+
+      <section class="tile wx-now" id="t-now" aria-label="Current conditions">
+        <div class="tile-head"><span class="name" id="now-name">NOW</span><span class="fresh" id="now-fresh">--</span></div>
+        <div class="now-main"><span class="num" id="now-temp">--</span><span id="now-wind">--</span></div>
+        <span class="small" id="now-extra">--</span>
+      </section>
+
+      <section class="tile wx-radio" id="t-radio" aria-label="NOAA Weather Radio">
+        <div class="tile-head"><span class="name">WEATHER RADIO</span></div>
+        <span class="num freq" id="nwr-freq">--</span>
+        <span class="radio-line" id="nwr-station">--</span>
+        <span class="small" id="nwr-same">--</span>
+      </section>
+    </div>
+
+    <section class="wx-periods" id="periods" aria-label="Forecast"></section>
+
+    <section class="tile wx-hours" id="t-hours" aria-label="Next 12 hours">
+      <div class="tile-head"><span class="name">NEXT 12 HOURS</span><span class="fresh" id="hours-fresh">--</span></div>
+      <div class="hours" id="hours"></div>
+      <span class="small hours-msg" id="hours-msg" hidden></span>
+    </section>
+
+  </div>
+
+  <footer class="toolbar">
+    <button id="refresh">Refresh</button>
+    <button disabled>Settings<span class="soon">Coming</span></button>
+    <button disabled>Sleep<span class="soon">Coming</span></button>
+    <button disabled>Help<span class="soon">Coming</span></button>
+    <div class="spacer"></div>
+    <button class="shutdown" disabled>Shut down…<span class="soon">Coming</span></button>
+  </footer>
+
+</div>
+<div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
+<script src="/static/common.js"></script>
+<script src="/static/weather.js"></script>
+</body>
+</html>

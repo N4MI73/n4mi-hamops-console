@@ -290,7 +290,7 @@ The word lists live in one file in the service.
   "lightning_outlook": {"level": "possible", "start": "2026-11-01T19:00:00Z", "basis": "forecast"},
   "hourly": [
     {"time": "2026-11-01T15:00:00Z", "temperature_f": 72, "rain_chance_pct": 20,
-     "wind_mph": 10, "gust_mph": 20, "wind_dir": "WSW", "thunder": null, "short": "Partly Sunny"}
+     "wind_mph": 10, "gust_mph": 20, "wind_dir": "WSW", "thunder": null, "lightning": null, "short": "Partly Sunny"}
   ],
   "periods": [
     {"name": "This Afternoon", "start": "2026-11-01T15:00:00Z", "end": "2026-11-01T22:00:00Z",
@@ -302,7 +302,7 @@ The word lists live in one file in the service.
 
 - **From NWS** for the grid's centre: the 12-hour forecast, the hourly forecast and the gridpoint data. **All three must arrive** or the last good set is kept. That way a missing gridpoint can never read as "no thunderstorms".
 - `issued_at` is NWS `updateTime`, not `generatedAt`. NWS revises a few times a day, so an `updateTime` several hours old is normal.
-- `hourly`: the next 12 hours. `gust_mph` comes from the gridpoint `windGust` series. `thunder` is the NWS coverage word for that hour, or `null`.
+- `hourly`: the next 12 hours. `gust_mph` comes from the gridpoint `windGust` series. `thunder` is the NWS coverage word for that hour, or `null`. **`lightning` (new 7 November 2026)** is that hour's plain level, `"likely"`, `"possible"` or `null`, by the same rule as `lightning_outlook`, so screens never interpret coverage words themselves.
 - `periods`: the next 4 twelve-hour periods. `wind` is NWS's own text (it can be a range) with the direction.
 - Hours and periods already over are dropped.
 - **Thunderstorms come from the gridpoint `weather` series only.** `probabilityOfThunder` was empty even with thunderstorms forecast, so it isn't used. The series' times are intervals (`start/PT12H`), and one interval can hold several weather items.
@@ -333,6 +333,7 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
       "title": "Severe Thunderstorm Warning",
       "detail": "60 mph wind gusts and quarter size hail. Until 10:36 AM (15:36 UTC).",
       "since": null,
+      "until": "2026-11-01T15:36:32Z",
       "ref": {"block": "weather.alerts", "id": "urn:oid:2.49.0.1.840.0.example"}
     },
     {
@@ -352,6 +353,8 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
 ```
 
 - The Priority Card shows the first `card` item, with ‹ › and "1 of N" across the other card items. The Alerts page lists everything, card and badge items alike.
+- **`until` (new 7 November 2026):** NWS alert items only (`ref.block` `weather.alerts`) carry the alert's NWS expiry, or `null`, so the Weather page can show a short "Until 3:04 PM" line instead of the full detail. Other items have no `until` key.
+- **Detail pages go back to Home (proposed 7 November 2026, with the Weather page; Dan to confirm on the Pi):** after 3 minutes untouched, and at once when a new unacknowledged critical item arrives, so a warning is never hidden behind a detail page. Each critical item does this once: one already shown on the Home screen, or already sent Home for, doesn't bounce the operator back again. Screen behaviour only.
 - **Rotation (changed 5 November 2026; replaces "no auto-scroll"):** with no critical item in the list, the card moves to the next card item every 60 seconds and wraps round. A critical item (always ranked first) pins the card on it until it ends, even after Acknowledge; with two, it stays on the worse one. ‹ › still page; touching them pauses rotation, and 30 seconds after the last touch the card returns to the first item and rotation carries on. A single item, or "All quiet.", never rotates. A new first item jumps to the front. This is screen behaviour; the service's ranking is unchanged by it.
 - **`tier`**: `card` items go on the Priority Card. `badge` items are counted on a small badge on the Alerts button, coloured by the worst one; the badge blinks for about 10 seconds when a new item arrives, then stays steady until the Alerts page is opened.
 - **`critical`**: flash the border (about once a second) and show Acknowledge. Flashing stops when acknowledged or after 2 minutes; the item stays on top until it ends.

@@ -96,8 +96,10 @@ def _nws_items(alerts):
         else:
             category, color = ("other_warning", "blue") if kind == "warning" else ("other_notice", "blue")
         detail = _join(a.get("hazard") or a.get("headline"), _until(a.get("expires")))
-        out.append(_item(category, a.get("event"), detail, a.get("onset"), "weather.alerts",
-                         a.get("id") or f"nws-{a.get('event')}-{a.get('expires')}", color))
+        item = _item(category, a.get("event"), detail, a.get("onset"), "weather.alerts",
+                     a.get("id") or f"nws-{a.get('event')}-{a.get('expires')}", color)
+        item["until"] = a.get("expires")    # for the Weather page's short line (2026-11-07)
+        out.append(item)
     return out
 
 

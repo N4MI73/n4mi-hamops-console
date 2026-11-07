@@ -1,126 +1,23 @@
-/* Ham Ops Console -- Home screen logic.
-
-   Everything here is display: the console service decides freshness and ranks
-   the alerts (contracts 0.4, docs/contracts.md). This page only turns its JSON
-   into words and colours, through one freshness function (freshText) so every
-   tile shows age and stale/unavailable the same way.
-
-   Polls the service every 15 s; the clock ticks every second. Text is set with
-   textContent only, never as HTML, so nothing from a data source can inject markup. */
+/* Ham Ops Console -- Home screen logic: the Priority Card and the three tiles.
+   Shared parts (status bar, module row and badge, clock, freshness words,
+   polling) are in common.js, which loads first. */
 "use strict";
 
-const POLL_MS = 15000;
 const IDLE_BACK_TO_TOP_MS = 30000;     // after a touch, the card returns to the worst item (approved)
 const ROTATE_MS = 60000;               // with nothing critical, the card moves on every 60 s (Dan, 2026-11-05)
 const FLASH_MAX_MS = 2 * 60 * 1000;    // a critical item flashes for at most 2 minutes (approved)
 
-const state = {
-  data: {},              // latest reply per endpoint
-  receivedAt: 0,         // Date.now() when the replies arrived (for ticking ages)
+Object.assign(state, {
   index: 0,              // Priority Card page
   topId: null,           // id of the worst card item last time
   shownId: null,         // id of the item on the card, so a new list keeps it in view
   shownSince: 0,         // when the card last changed page (for the 60 s rotation)
   lastTouch: 0,          // last touch of < > or Clear; 0 = no touch pending
-  firstSeen: {},         // critical item id -> when this screen first showed it
-  badgeIds: null,        // badge item ids last time (null until the first poll)
+  // critical item id -> when this browser first showed it, kept across screens so
+  // visiting the Weather page doesn't restart a warning's 2-minute flash.
+  firstSeen: recall("hoc.firstSeen", {}),
   clearArmed: 0,         // Clear hold: first tap arms (time), second confirms within 10 s
-};
-
-const $ = id => document.getElementById(id);
-const dash = v => (v === null || v === undefined || Number.isNaN(v)) ? "--" : v;
-const round = (v, places = 0) => (typeof v === "number") ? Number(v.toFixed(places)) : null;
-
-// ----------------------------------------------------------------- time words
-
-function localClock(d) {
-  return d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
-}
-function clockPair(iso) {            // "10:21 AM (15:21 UTC)" -- local first, UTC beside it
-  if (!iso) return "--";
-  const d = new Date(iso);
-  return `${localClock(d)} (${d.toISOString().slice(11, 16)} UTC)`;
-}
-function ageWords(sec) {
-  if (sec === null || sec === undefined) return "--";
-  if (sec < 60) return `${Math.round(sec)} s ago`;
-  if (sec < 3600) return `${Math.round(sec / 60)} min ago`;
-  return `${(sec / 3600).toFixed(1)} h ago`;
-}
-function liveAge(block) {           // the service's age, plus time since the reply arrived
-  if (!block || block.age_sec === null || block.age_sec === undefined) return null;
-  return block.age_sec + (Date.now() - state.receivedAt) / 1000;
-}
-
-function tickClock() {
-  const now = new Date();
-  $("utc").textContent = now.toISOString().slice(11, 16) + "Z";
-  const zone = new Intl.DateTimeFormat([], {timeZoneName: "short"}).formatToParts(now)
-    .find(p => p.type === "timeZoneName");
-  const day = now.toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short"});
-  $("local").textContent = `${localClock(now)}${zone ? " " + zone.value : ""} · ${day}`;
-}
-
-// ----------------------------------------------------------------- freshness (one function)
-
-/* -> {text, cls, dot}: the words and colour for a block's freshness, used by every tile. */
-function freshText(block, sourceName) {
-  if (!block) return {text: "--", cls: "", dot: ""};
-  const name = sourceName || block.source || "";
-  switch (block.status) {
-    case "ok": return {text: `${name} · ${ageWords(liveAge(block))}`, cls: "", dot: "good"};
-    case "stale": {
-      const age = liveAge(block);
-      return {text: `STALE · ${age === null ? "--" : Math.round(age / 60)} MIN`, cls: "stale", dot: "fair"};
-    }
-    case "test": return {text: "TEST MODE", cls: "test", dot: "fair"};
-    default: return {text: "UNAVAILABLE", cls: "unavailable", dot: "bad"};
-  }
-}
-function setFresh(el, block, name) {
-  const f = freshText(block, name);
-  el.textContent = f.text;
-  el.className = "fresh " + f.cls;
-  return f;
-}
-function setDot(el, cls) { el.className = "dot " + (cls || ""); }
-
-// ----------------------------------------------------------------- status bar
-
-function renderStatusBar() {
-  const {settings, weather, propagation, system} = state.data;
-  const mode = (weather && weather.mode) || (settings && settings.mode) || "home";
-  $("mode").textContent = mode === "field" ? "FIELD MODE" : "HOME MODE";
-  const station = settings && settings.station && settings.station[mode];
-  const loc = weather && weather.location;
-  $("station").textContent = `${dash(station && station.callsign)} · ${dash((loc && loc.grid) || (station && station.grid))}`;
-
-  // Internet: NWS reachable (the forecast fetch). NAS: the home sources. GPS: receiver present.
-  const fc = weather && weather.forecast;
-  pill("pill-internet", fc ? freshText(fc).dot : "", true);
-  const nas = $("pill-nas");
-  if (mode === "home") {
-    nas.hidden = false;
-    const blocks = [propagation && propagation.propagation, weather && weather.conditions];
-    pill("pill-nas", worstDot(blocks.map(b => freshText(b).dot)), true);
-  } else {
-    nas.hidden = true;
-  }
-  const gps = system && system.system && system.system.gps;
-  const gpsPill = $("pill-gps");
-  const present = gps && gps.present;
-  gpsPill.querySelector(".label").textContent = present ? (gps.fix ? `GPS ${gps.fix.toUpperCase()}` : "GPS") : "GPS off";
-  pill("pill-gps", present ? (gps.fix ? "good" : "fair") : "off", present);
-}
-function pill(id, dot, on) {
-  const el = $(id);
-  setDot(el.querySelector(".dot"), dot);
-  el.classList.toggle("off", !on);
-}
-function worstDot(dots) {
-  for (const d of ["bad", "fair", ""]) if (dots.includes(d)) return d;
-  return "good";
-}
+});
 
 // ----------------------------------------------------------------- Priority Card
 
@@ -163,7 +60,9 @@ function renderPriority() {
   const item = cards[state.index];
   state.shownId = item.ref.id;
 
-  for (const c of cards) if (c.critical && !(c.ref.id in state.firstSeen)) state.firstSeen[c.ref.id] = t;
+  let added = false;
+  for (const c of cards) if (c.critical && !(c.ref.id in state.firstSeen)) { state.firstSeen[c.ref.id] = t; added = true; }
+  if (added) remember("hoc.firstSeen", state.firstSeen);
   const flashing = item.critical && !item.acknowledged && t - state.firstSeen[item.ref.id] < FLASH_MAX_MS;
 
   const quiet = item.category === "all_quiet";
@@ -213,21 +112,6 @@ function quietAside() {
   if (w.lightning && w.lightning.status === "ok" && w.lightning.within_10mi === false) parts.push("no lightning");
   const line2 = (p.status === "ok") ? `K ${dash(p.k_index)} · SFI ${dash(p.sfi)}` : "";
   return parts.join(" · ") + (line2 ? (parts.length ? " · " : "") + line2 : "");
-}
-
-function renderBadge() {
-  const a = state.data.alerts;
-  const items = (a && a.items ? a.items : []).filter(i => i.tier === "badge");
-  const badge = $("badge");
-  badge.hidden = !items.length;
-  badge.textContent = items.length;
-  badge.setAttribute("aria-label", `${items.length} notification${items.length === 1 ? "" : "s"}`);
-  badge.classList.toggle("blue", items.length > 0 && items.every(i => i.color === "blue"));
-  const ids = items.map(i => i.ref.id);
-  if (state.badgeIds && ids.some(id => !state.badgeIds.includes(id))) {
-    badge.classList.remove("blink"); void badge.offsetWidth; badge.classList.add("blink");  // ~10 s
-  }
-  state.badgeIds = ids;
 }
 
 // ----------------------------------------------------------------- tiles
@@ -382,39 +266,13 @@ function renderSystem() {
 }
 
 function renderAll() {
-  renderStatusBar();
   renderPriority();
-  renderBadge();
   renderPropagation();
   renderWeather();
   renderSystem();
 }
 
-// ----------------------------------------------------------------- polling and actions
-
-async function getJSON(path) {
-  const r = await fetch(path, {cache: "no-store"});
-  if (!r.ok) throw new Error(`${path}: ${r.status}`);
-  return r.json();
-}
-
-let settingsAt = 0;
-async function poll() {
-  try {
-    const wantSettings = Date.now() - settingsAt > 60000;
-    const [propagation, weather, alerts, system, settings] = await Promise.all([
-      getJSON("/api/propagation"), getJSON("/api/weather"), getJSON("/api/alerts"), getJSON("/api/system"),
-      wantSettings ? getJSON("/api/settings") : Promise.resolve(state.data.settings),
-    ]);
-    if (wantSettings) settingsAt = Date.now();
-    Object.assign(state.data, {propagation, weather, alerts, system, settings});
-    state.receivedAt = Date.now();
-    $("service-down").hidden = true;
-    renderAll();
-  } catch (e) {
-    $("service-down").hidden = false;
-  }
-}
+// ----------------------------------------------------------------- actions
 
 $("p-prev").addEventListener("click", () => page(-1));
 $("p-next").addEventListener("click", () => page(1));
@@ -442,11 +300,10 @@ $("p-clear").addEventListener("click", async e => {
   try { await fetch("/api/alerts/clear-hold", {method: "POST"}); }
   finally { e.target.disabled = false; poll(); }
 });
-$("refresh").addEventListener("click", () => poll());
 function touched() { state.lastTouch = Date.now(); state.clearArmed = 0; renderPriority(); }
 
-tickClock();
-setInterval(() => { tickClock(); if (state.receivedAt) { renderPriority(); renderStatusBar(); } }, 1000);
-setInterval(() => { if (state.receivedAt) { renderPropagation(); renderWeather(); renderSystem(); } }, 10000);
-setInterval(poll, POLL_MS);
-poll();
+startScreen({
+  render: renderAll,
+  tick: renderPriority,
+  slow: () => { renderPropagation(); renderWeather(); renderSystem(); },
+});

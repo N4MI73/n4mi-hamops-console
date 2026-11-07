@@ -1,0 +1,76 @@
+/* Ham Ops Console -- Weather page (approved mockup "Weather page", 2026-10-12).
+   Uses home.css for the shared parts (fonts, colours, status bar, module row, tiles,
+   toolbar). Text stays at 16 px or larger, as on the Home screen. */
+
+.wx-body { flex-grow: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.wx-top { height: 150px; flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) 330px 300px; gap: 10px; }
+.wx-top .tile { padding: 12px 16px; gap: 8px; }
+.wx-top .tile-head .name { white-space: nowrap; }
+
+/* -- This location: two state rows (lightning, NWS alerts) */
+.state-row {
+  display: flex; align-items: center; gap: 12px; padding: 5px 14px; min-width: 0;
+  border-radius: 8px; border: 1px solid var(--panel-line); background: var(--well);
+}
+/* The alert or lightning words are never cut (as on the Home screen); only the note shortens. */
+.state-row .what { font-size: 21px; font-weight: 600; white-space: nowrap; flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.state-row .note { font-size: 17px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0; }
+.state-row.good { background: var(--good-bg); border-color: var(--good-line); }
+.state-row.good .note { color: #A9D9BA; }
+.state-row.fair { background: var(--fair-bg); border-color: var(--fair-line); }
+.state-row.fair .note { color: #D9C9A8; }
+.state-row.bad { background: var(--bad-bg); border-color: var(--bad-line); }
+.state-row.bad .note { color: var(--bad-label); }
+
+/* -- Now and Weather Radio */
+.now-main { display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }
+.now-main .num { font-size: 50px; line-height: 1; }
+.now-main span:last-child { font-size: 20px; overflow: hidden; text-overflow: ellipsis; }
+.wx-now .small, .wx-radio .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.is-stale .now-main { color: var(--grey); }
+#now-extra.unavailable { color: var(--bad); font-weight: 600; white-space: normal; }
+.freq { font-size: 36px; line-height: 1.05; }
+.radio-line { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wx-radio.not-loaded .freq { font-family: "Barlow", sans-serif; font-size: 22px; font-weight: 600; color: var(--ink-2); line-height: 1.2; }
+.wx-radio.not-loaded .radio-line { color: var(--muted); font-size: 18px; white-space: normal; }
+
+/* -- Forecast periods */
+.wx-periods { height: 158px; flex-shrink: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.period {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; min-width: 0;
+  background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
+}
+.period.storm { border-color: var(--fair-line); }
+.period .pname { font-size: 18px; font-weight: 600; color: var(--ink-2); }
+.period .short {
+  font-size: 20px; font-weight: 600; line-height: 1.15;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.period.storm .short { color: var(--fair-label); }
+.period .row { display: flex; justify-content: space-between; align-items: baseline; margin-top: auto; }
+.period .temp { font-size: 34px; line-height: 1; }
+.period .temp small { font-family: "Barlow", sans-serif; font-size: 16px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.period .rain { font-size: 18px; }
+.period .wind { font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wx-periods .empty {
+  grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
+}
+.wx-periods.is-stale .short, .wx-periods.is-stale .temp { color: var(--grey) !important; }
+
+/* -- Next 12 hours */
+.wx-hours { flex-grow: 1; min-height: 0; padding: 10px 18px; gap: 6px; }
+.hours {
+  flex-grow: 1; display: grid; grid-template-columns: 112px repeat(12, minmax(0, 1fr));
+  column-gap: 6px; row-gap: 4px; align-items: center; font-size: 17px;
+}
+.hours .rowname { color: var(--muted); }
+.hours .cell { text-align: center; white-space: nowrap; }
+.hours .hr { font-weight: 600; }
+.hours .lt { font-size: 16px; font-weight: 700; padding: 2px 0; border-radius: 4px; color: var(--dim); }
+.hours .lt.possible { color: var(--fair-label); background: #2A2010; }
+.hours .lt.likely { color: var(--ground); background: var(--fair); }
+.hours .gust.high { color: var(--fair-label); font-weight: 600; }
+.wx-hours.is-stale .hours .cell { color: var(--grey); }
+.wx-hours.is-stale .hours .lt.likely { background: var(--dim); color: var(--ground); }
+.hours-msg { flex-grow: 1; display: flex; align-items: center; justify-content: center; font-size: 20px; }

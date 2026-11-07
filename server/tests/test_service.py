@@ -205,6 +205,8 @@ class Endpoints(unittest.TestCase):
             f.write("<!doctype html><title>test</title>")
         with open(os.path.join(dashboard, "check.html"), "w") as f:
             f.write("<title>check</title>")
+        with open(os.path.join(dashboard, "weather.html"), "w") as f:
+            f.write("<title>weather</title>")
         os.makedirs(os.path.join(dashboard, "fonts"))
         with open(os.path.join(dashboard, "fonts", "x.woff2"), "wb") as f:
             f.write(b"wOF2")
@@ -226,11 +228,17 @@ class Endpoints(unittest.TestCase):
         with self.client.get("/static/fonts/x.woff2") as r:
             self.assertEqual(r.status_code, 200)
 
+    def test_weather_page_served(self):
+        with self.client.get("/weather") as r:
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(b"<title>weather</title>", r.data)
+
     def test_real_dashboard_files_exist(self):
         """The page, its script, style and every font the style names are in the repo."""
         import re
         root = os.path.join(os.path.dirname(os.path.dirname(HERE)), "dashboard")
-        for name in ("index.html", "home.js", "home.css", "check.html"):
+        for name in ("index.html", "home.js", "home.css", "check.html",
+                     "common.js", "weather.html", "weather.js", "weather.css"):
             self.assertTrue(os.path.exists(os.path.join(root, name)), name)
         with open(os.path.join(root, "home.css")) as f:
             fonts = re.findall(r'url\("([^"]+)"\)', f.read())

@@ -128,6 +128,8 @@ class Storm(unittest.TestCase):
         self.assertFalse(any(i["critical"] for i in self.items[2:]))
         self.assertEqual(warning["color"], "red")
         self.assertEqual(warning["detail"], "60 mph wind gusts and quarter size hail. Until 10:36 AM (15:36 UTC).")
+        self.assertEqual(warning["until"], "2026-11-01T15:36:32Z")   # NWS expiry, for the Weather page
+        self.assertNotIn("until", strike)                            # only NWS alert items carry it
         self.assertEqual(strike["title"], "Lightning 3.5 mi away")
         self.assertEqual(strike["detail"], "4 strikes in 10 min. Stay in until 10:21 AM (15:21 UTC).")
         self.assertEqual(strike["ref"]["id"], "lightning-5mi-2026-11-01T14:51:32Z")

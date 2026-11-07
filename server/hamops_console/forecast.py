@@ -155,6 +155,14 @@ def _at(series, when):
     return None
 
 
+def lightning_level(coverage):
+    """An NWS thunderstorm coverage word -> "likely", "possible" or None.
+    The same rule as the outlook: an unrecognised word still counts as possible."""
+    if coverage is None:
+        return None
+    return "likely" if coverage in LIKELY else "possible"
+
+
 def thunder_outlook(intervals, now, hours=HOURS):
     """(thunder_next, lightning_outlook) from the thunderstorm intervals.
 
@@ -207,6 +215,7 @@ def translate(forecast, hourly, gridpoint, now):
             "gust_mph": _at(gusts, start),
             "wind_dir": _text(period.get("windDirection")),
             "thunder": _at(thunder, start),
+            "lightning": lightning_level(_at(thunder, start)),
             "short": _text(period.get("shortForecast")),
         })
         if len(hours) == HOURS:
