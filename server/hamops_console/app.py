@@ -2,7 +2,8 @@
 
 Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather, /api/alerts,
 /api/system, POST /api/alerts/ack and /api/alerts/clear-hold, and
-GET/PUT /api/settings with POST /api/settings/test.
+GET/PUT /api/settings with POST /api/settings/test. 2026-11-07: POST
+/api/weather-radio/refresh.
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -94,6 +95,14 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, dashboa
         if not any(i["category"] in lightning for i in ranked()):
             return jsonify({"error": "No lightning hold to clear"}), 409
         return jsonify({"cleared_at": freshness.iso(weather.clear_hold())})
+
+    @app.post("/api/weather-radio/refresh")
+    def api_weather_radio_refresh():
+        """Update the stored NOAA Weather Radio list now (before a field event),
+        instead of waiting for the weekly download. Runs in the background;
+        the weather_radio block shows `updating` until it finishes."""
+        started = weather.nwr.refresh_now()
+        return jsonify({"started": started}), (202 if started else 409)
 
     @app.get("/api/settings")
     def api_settings():

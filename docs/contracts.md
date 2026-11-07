@@ -83,7 +83,8 @@ The dashboard polls the service every 15 seconds.
 | `GET /` | The dashboard page | Yes (a plain check page until the dashboard is built) |
 | `GET /healthz` | `{"status": "ok", "version": "..."}`; the kiosk waits for it at boot | Yes |
 | `GET /api/propagation` | Propagation block (§4) | Yes, Home |
-| `GET /api/weather` | Weather blocks (§5) | Home; forecast both modes |
+| `GET /api/weather` | Weather blocks (§5) | Home; forecast and weather radio both modes |
+| `POST /api/weather-radio/refresh` | Update the stored NOAA Weather Radio list now, e.g. before a field event (§5) | Yes (7 Nov 2026) |
 | `GET /api/alerts` | The ranked list behind the Priority Card and Alerts page (§6) | Yes |
 | `POST /api/alerts/ack` | `{"id": "..."}`: the console's own Acknowledge (§6) | Yes |
 | `POST /api/alerts/clear-hold` | Ends the lightning holds early, by the operator (§6) | **New in 0.4** |
@@ -266,7 +267,7 @@ The word lists live in one file in the service.
 
 ```json
 "weather_radio": {
-  "status": "ok", "source": "NWS NWR listing (stored on the Pi)", "fetched_at": "2026-11-07T15:00:00Z", "issued_at": null, "age_sec": 3600, "message": null,
+  "status": "ok", "source": "NWS NWR listing (stored on the Pi)", "fetched_at": "2026-11-07T15:00:00Z", "issued_at": null, "age_sec": 3600, "message": null, "updating": false,
   "county": "Example County, VA", "same_code": "051000",
   "nearest": [
     {"callsign": "WXX00", "frequency_mhz": 162.550, "site": "Example City", "distance_mi": 18.2,
@@ -276,7 +277,7 @@ The word lists live in one file in the service.
 ```
 
 - Which NOAA Weather Radio transmitter to tune for the console's location, and the county's SAME code for programming a weather radio.
-- **Stored on the Pi** (`~/.local/state/hamops-console/nwr_stations.json`, a compact copy), so it works in the field with no internet. Downloaded from NWS (`https://www.weather.gov/source/nwr/JS/CCL.js`, about 2.5 MB) in the background when there is no copy yet, then at most once a day; a failed download keeps the stored copy and is retried after an hour. `fetched_at` is when the stored copy was downloaded. The block is `stale` when the copy is over 30 days old (still shown) and `unavailable` only when there is no copy yet or the station grid isn't valid.
+- **Stored on the Pi** (`~/.local/state/hamops-console/nwr_stations.json`, a compact copy), so it works in the field with no internet. Downloaded from NWS (`https://www.weather.gov/source/nwr/JS/CCL.js`, about 2.5 MB) in the background when there is no copy yet, then **once a week** (Dan, 7 November 2026: sites and frequencies rarely change); a failed download keeps the stored copy and is retried after 6 hours. **On demand:** `POST /api/weather-radio/refresh` starts a download at once, e.g. before a field event (202 `{"started": true}`; 409 while one is already running); `updating` is `true` while a download runs. `fetched_at` is when the stored copy was downloaded; the Weather page shows its age ("List · 3 days"). The block is `stale` when the copy is over 30 days old (still shown) and `unavailable` only when there is no copy yet or the station grid isn't valid.
 - **County:** from the NWS points lookup the forecast already makes (`location.nws_county`, e.g. `VAC059` → SAME `051059`). `same_code` is the whole-county code. Until NWS has answered at this location, `county` and `same_code` are `null`.
 - **`nearest`** (the first entry is the one to tune; distances from the centre of the station grid):
   1. Transmitters NWS lists for the county, working before degraded, nearest first (`covers_county: true`). A transmitter not listed for the county doesn't carry its SAME-coded warnings, so a listed one comes first even when another is nearer.

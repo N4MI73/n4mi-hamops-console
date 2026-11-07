@@ -152,9 +152,23 @@ function renderNow() {
   $("now-extra").textContent = parts.join(" · ");
 }
 
+/* How old the stored transmitter list is, in days ("List · 3 days"; updated weekly,
+   or on demand before a field event), so it's easy to check before leaving home. */
+function radioListAge(r) {
+  if (r && r.updating) return {text: "Updating list", cls: ""};
+  const age = liveAge(r);
+  if (!r || age === null) return {text: "", cls: ""};
+  const days = Math.floor(age / 86400);
+  const words = days === 0 ? "List · today" : `List · ${days} day${days === 1 ? "" : "s"}`;
+  return {text: r.status === "stale" ? words.toUpperCase() : words, cls: r.status === "stale" ? "stale" : ""};
+}
+
 function renderRadio() {
   const r = (state.data.weather || {}).weather_radio;
   const tile = $("t-radio");
+  const age = radioListAge(r);
+  $("nwr-fresh").textContent = age.text;
+  $("nwr-fresh").className = "fresh " + age.cls;
   const pick = r && r.status !== "unavailable" && (r.nearest || []).find(s => s.status !== "OUT OF SERVICE");
   tile.classList.toggle("not-loaded", !pick);
   if (!pick) {

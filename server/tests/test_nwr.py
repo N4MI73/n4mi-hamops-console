@@ -238,29 +238,51 @@ class Source(Small):
         with open(self.path, encoding="utf-8") as f:
             self.assertEqual(json.load(f)["downloaded_at"], "2026-11-07T15:00:00Z")
 
-    def test_at_most_daily_and_the_stored_copy_survives_a_restart(self):
+    def test_weekly_and_the_stored_copy_survives_a_restart(self):
         source = self.make(ccl())
         source.block(GRID, "DCC001")
-        self.clock.now = T0 + timedelta(hours=23)
+        self.clock.now = T0 + timedelta(days=6, hours=23)
         source.block(GRID, "DCC001")
         self.assertEqual(self.fetch.calls, 1)
         # A restart, offline: the stored copy is used and the download is retried, not waited for.
         offline = StandIn(urllib.error.URLError("offline"))
         again = nwr.NwrSource(settings(), fetch=offline, clock=self.clock, run=lambda job: job(), path=self.path)
         b = again.block(GRID, "DCC001")
-        self.assertEqual(offline.calls, 0)          # under a day old: nothing to fetch
+        self.assertEqual(offline.calls, 0)          # under a week old: nothing to fetch
         self.assertEqual(b["nearest"][0]["callsign"], "WNG736")
-        self.clock.now = T0 + timedelta(hours=25)
+        self.clock.now = T0 + timedelta(days=7, hours=1)
         b = again.block(GRID, "DCC001")
         self.assertEqual(offline.calls, 1)
-        self.assertEqual(b["status"], "ok")          # one day old is still current
+        self.assertEqual(b["status"], "ok")          # a week old is still current
         self.assertEqual(b["nearest"][0]["callsign"], "WNG736")
-        self.clock.now = T0 + timedelta(hours=25, minutes=30)
+        self.clock.now = T0 + timedelta(days=7, hours=6)
         again.block(GRID, "DCC001")
-        self.assertEqual(offline.calls, 1)          # retried after an hour, not every request
-        self.clock.now = T0 + timedelta(hours=26, minutes=1)
+        self.assertEqual(offline.calls, 1)          # retried after 6 hours, not every request
+        self.clock.now = T0 + timedelta(days=7, hours=7, minutes=1)
         again.block(GRID, "DCC001")
         self.assertEqual(offline.calls, 2)
+
+    def test_on_demand_update_ignores_the_weekly_schedule(self):
+        source = self.make(ccl())
+        source.block(GRID, "DCC001")
+        self.clock.now = T0 + timedelta(days=1)
+        self.assertTrue(source.refresh_now())
+        self.assertEqual(self.fetch.calls, 2)
+        b = source.block(GRID, "DCC001")
+        self.assertEqual(b["fetched_at"], "2026-11-08T15:00:00Z")
+        self.assertIs(b["updating"], False)
+        self.assertEqual(self.fetch.calls, 2)       # and the weekly clock starts again from it
+
+    def test_on_demand_update_while_one_is_running(self):
+        held = []
+        source = nwr.NwrSource(settings(), fetch=StandIn(ccl()), clock=Clock(T0), run=held.append,
+                               path=os.path.join(tempfile.mkdtemp(), "nwr.json"))
+        b = source.block(GRID, "DCC001")            # first download starts, held
+        self.assertIs(b["updating"], True)
+        self.assertEqual(b["message"], "Downloading the NWS weather radio list")
+        self.assertFalse(source.refresh_now())
+        held.pop()()
+        self.assertTrue(source.refresh_now())
 
     def test_month_old_copy_is_stale_but_shown(self):
         source = self.make(ccl())
@@ -304,6 +326,25 @@ class Source(Small):
         b = source.block("nonsense", "DCC001")
         self.assertEqual(b["status"], "unavailable")
         self.assertEqual(b["nearest"], [])
+
+
+class Endpoint(Small):
+
+    def test_refresh_endpoint(self):
+        from hamops_console.app import create_app
+        held = []
+        radio = nwr.NwrSource(settings(), fetch=StandIn(ccl()), clock=Clock(T0), run=held.append,
+                              path=os.path.join(tempfile.mkdtemp(), "nwr.json"))
+
+        class Weather:
+            nwr = radio
+
+        client = create_app(settings(), propagation=object(), weather=Weather(),
+                            settings_file=os.path.join(tempfile.mkdtemp(), "s.json")).test_client()
+        r = client.post("/api/weather-radio/refresh")
+        self.assertEqual((r.status_code, r.get_json()), (202, {"started": True}))
+        r = client.post("/api/weather-radio/refresh")
+        self.assertEqual((r.status_code, r.get_json()), (409, {"started": False}))
 
 
 class AlertWording(Small):

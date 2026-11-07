@@ -17,8 +17,11 @@ covers ("NW 1/2", "E").
 The console keeps a compact copy on the Pi
 (~/.local/state/hamops-console/nwr_stations.json, about 200 KB), so the
 weather radio panel works in the field with no internet. It is downloaded in
-the background when there is none yet, and then at most once a day; a failed
-download keeps the copy already stored and is retried after an hour.
+the background when there is none yet, then once a week; a failed download
+keeps the copy already stored and is retried after 6 hours. Sites and
+frequencies rarely change; a transmitter's status can, so before a field
+event the operator can update it on demand (refresh_now, POST
+/api/weather-radio/refresh) -- Dan, 2026-11-07.
 
 Choosing the transmitter (2026-11-07; Dan to validate the radio side):
   1. Transmitters NWS lists for the location's county come first, working
@@ -52,8 +55,8 @@ log = logging.getLogger(__name__)
 SOURCE = "NWS NWR listing (stored on the Pi)"
 URL = "https://www.weather.gov/source/nwr/JS/CCL.js"
 TIMEOUT_SEC = 60
-REFRESH_SEC = 24 * 3600          # at most once a day (contract)
-RETRY_AFTER_FAIL_SEC = 3600
+REFRESH_SEC = 7 * 86400         # once a week (Dan, 2026-11-07), or on demand
+RETRY_AFTER_FAIL_SEC = 6 * 3600
 STALE_AFTER_SEC = 30 * 86400     # the list changes rarely; a month-old copy is still shown
 FORMAT = 1
 NEAREST = 3                      # entries in `nearest`
@@ -267,6 +270,21 @@ class NwrSource:
             self._failed, self._error, self._busy = False, None, False
         log.info("weather radio list refreshed: %d transmitters", len(data["transmitters"]))
 
+    def refresh_now(self):
+        """The operator's on-demand update (e.g. before a field event): starts a
+        download in the background at once, whatever the weekly schedule says.
+        Returns False if one is already running."""
+        with self._lock:
+            if self._busy:
+                return False
+            self._busy, self._attempted_at = True, self._clock()
+        self._run(self._refresh)
+        return True
+
+    def updating(self):
+        with self._lock:
+            return self._busy
+
     @staticmethod
     def _describe(e):
         if isinstance(e, urllib.error.HTTPError):
@@ -292,10 +310,11 @@ class NwrSource:
             if data is None:
                 error = self._error or "Downloading the NWS weather radio list"
                 out = freshness.block(SOURCE, None, None, STALE_AFTER_SEC, error=error, now=now)
-                out.update({"county": None, "same_code": None, "nearest": []})
+                out.update({"updating": self._busy, "county": None, "same_code": None, "nearest": []})
                 return out
             downloaded = freshness.parse_time(data["downloaded_at"])
             out = freshness.block(SOURCE, downloaded, None, STALE_AFTER_SEC, error=self._error, now=now)
+            out["updating"] = self._busy
         if not grid_mod.is_valid(grid):
             out.update({"status": freshness.UNAVAILABLE, "message": "Station grid not set or not valid in Settings",
                         "county": None, "same_code": None, "nearest": []})
