@@ -24,6 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 from hamops_console import forecast as fc, grid, settings as settings_mod  # noqa: E402
+from hamops_console.nwr import NwrSource  # noqa: E402
 from hamops_console.weather import WeatherSource, apply_storm_alerts, storm_alert  # noqa: E402
 
 G = "https://api.weather.gov/gridpoints/LWX/97,71"
@@ -396,7 +397,10 @@ class WeatherIntegration(unittest.TestCase):
         clock = Clock(T0)
         nws = NWS()
         forecast = fc.ForecastSource(settings, fetch=nws, clock=clock, run=lambda job: job())
-        weather = WeatherSource(settings, fetch=lambda url: {"simulation": False}, clock=clock, forecast=forecast)
+        offline = NwrSource(settings, fetch=lambda url, contact: (_ for _ in ()).throw(OSError("offline")),
+                            clock=clock, run=lambda job: job(), path=os.path.join(tempfile.mkdtemp(), "nwr.json"))
+        weather = WeatherSource(settings, fetch=lambda url: {"simulation": False}, clock=clock, forecast=forecast,
+                                nwr=offline)
         w = weather.blocks()
         self.assertEqual(w["location"]["nws_office"], "LWX")
         self.assertIn("too coarse", w["location"]["grid_warning"])

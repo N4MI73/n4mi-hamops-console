@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 from hamops_console import alert_classes, freshness, settings as settings_mod  # noqa: E402
 from hamops_console.forecast import ForecastSource  # noqa: E402
+from hamops_console.nwr import NwrSource  # noqa: E402
 from hamops_console.weather import LightningState, WeatherSource  # noqa: E402
 
 LIVE = {
@@ -122,7 +123,10 @@ def make(reply, now, mode="home", state_path=None):
     no_nws = ForecastSource(settings, fetch=StandIn(urllib.error.URLError("offline")),
                             clock=clock, run=lambda job: job())
     state = LightningState(state_path or os.path.join(tempfile.mkdtemp(), "lightning.json"))
-    return (WeatherSource(settings, fetch=stand_in, clock=clock, forecast=no_nws, lightning_state=state),
+    no_nwr = NwrSource(settings, fetch=StandIn(urllib.error.URLError("offline")), clock=clock,
+                       run=lambda job: job(), path=os.path.join(tempfile.mkdtemp(), "nwr.json"))
+    return (WeatherSource(settings, fetch=stand_in, clock=clock, forecast=no_nws, lightning_state=state,
+                          nwr=no_nwr),
             stand_in, clock)
 
 
@@ -193,7 +197,9 @@ class LiveSample(unittest.TestCase):
 
     def test_later_blocks_not_yet_built(self):
         self.assertEqual(self.w["forecast"]["status"], "unavailable")  # NWS offline here
-        self.assertIsNone(self.w["weather_radio"])
+        # The weather radio list can't be downloaded here (offline): unavailable, with the reason.
+        self.assertEqual(self.w["weather_radio"]["status"], "unavailable")
+        self.assertEqual(self.w["weather_radio"]["nearest"], [])
         self.assertEqual(self.w["location"]["label"], "Home")
 
     def test_fetches_at_most_once_a_minute(self):

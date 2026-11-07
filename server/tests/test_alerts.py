@@ -221,7 +221,8 @@ class Sources(unittest.TestCase):
         self.assertEqual(cats(items), ["source_down", "source_down"])
         first = items[0]
         self.assertEqual(first["title"], "NWS alerts out of date")
-        self.assertEqual(first["detail"], "Weather Sentinel can't reach NWS. Not the same as no alerts.")
+        self.assertEqual(first["detail"], "Weather Sentinel can't reach NWS. Not the same as no alerts. "
+                         "Tune NOAA Weather Radio.")
         self.assertEqual(first["ref"], {"block": "weather.alerts", "id": alerts.NWS_ALERTS_SOURCE_ID})
         self.assertEqual(items[1]["title"], "PropMon data is stale")
 

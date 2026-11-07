@@ -17,10 +17,10 @@ Consumer rules agreed with Weather Sentinel (2026-10-12), all applied here:
   3. Read defensively: unknown fields are ignored; a missing field is
      unknown (null) -- never an exception and never "all clear".
 
-The NWS forecast (both modes) comes from forecast.py. Field Mode's own NWS
-alerts and station observations come in a later step; until then, in Field
-Mode the alerts and conditions blocks say they aren't built yet.
-`weather_radio` is null until the stored NOAA Weather Radio list is built.
+The NWS forecast (both modes) comes from forecast.py, and the NOAA Weather
+Radio block (both modes) from nwr.py. Field Mode's own NWS alerts and station
+observations come in a later step; until then, in Field Mode the alerts and
+conditions blocks say they aren't built yet.
 
 The console's own lightning state -- the 5-mile hold and the operator's
 Clear -- is saved on the Pi (LightningState) so it survives a restart.
@@ -41,6 +41,7 @@ from pathlib import Path
 
 from . import alert_classes, freshness, grid as grid_mod
 from .forecast import ForecastSource
+from .nwr import NwrSource
 
 log = logging.getLogger(__name__)
 
@@ -199,8 +200,9 @@ class WeatherSource:
     """Keeps the last good Weather Sentinel reply and builds the weather blocks."""
 
     def __init__(self, settings, fetch=fetch_sentinel, clock=freshness.utcnow, forecast=None,
-                 lightning_state=None):
+                 lightning_state=None, nwr=None):
         self.settings = settings
+        self.nwr = nwr or NwrSource(settings, clock=clock)
         self._state = lightning_state or LightningState()
         self.forecast = forecast or ForecastSource(settings, clock=clock)
         self._fetch = fetch
@@ -395,6 +397,9 @@ class WeatherSource:
                                     if grid_mod.is_valid(grid) and len(grid.strip()) == 4 else None)
         return location
 
+    def _radio_block(self, location):
+        return self.nwr.block(location.get("grid"), location.get("nws_county"))
+
     def blocks(self):
         """The weather blocks for GET /api/weather (everything but the envelope)."""
         now = self._clock()
@@ -405,19 +410,22 @@ class WeatherSource:
             alerts["items"] = []
             conditions = self._not_built(msg)
             conditions.update(EMPTY_CONDITIONS)
-            return {"location": self._location(), "alerts": alerts, "conditions": conditions,
-                    "lightning": None, "weather_radio": None, "forecast": forecast}
+            location = self._location()
+            return {"location": location, "alerts": alerts, "conditions": conditions,
+                    "lightning": None, "weather_radio": self._radio_block(location), "forecast": forecast}
         with self._lock:
             self._refresh_if_due(now)
             alerts = self._alerts_block(now)
+            location = self._location()
             out = {
-                "location": self._location(),
+                "location": location,
                 "alerts": alerts,
                 "conditions": self._conditions_block(now),
                 "lightning": self._lightning_block(now),
-                "weather_radio": None,   # stored NOAA Weather Radio list: later step
+                "weather_radio": None,
                 "forecast": forecast,
             }
+        out["weather_radio"] = self._radio_block(location)
         apply_storm_alerts(forecast, alerts, now)
         return out
 

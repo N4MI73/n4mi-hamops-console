@@ -39,6 +39,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from . import freshness
+from .nwr import tune_words
 
 log = logging.getLogger(__name__)
 
@@ -143,7 +144,7 @@ def _forecast_lightning(forecast, now):
                   outlook.get("start"), "weather.forecast", f"lightning-outlook-{level}", "yellow")]
 
 
-def _alerts_unavailable_storms(alerts, forecast, now, hours):
+def _alerts_unavailable_storms(alerts, forecast, now, hours, tune):
     if alerts.get("status") not in (freshness.UNAVAILABLE, freshness.STALE):
         return []
     outlook = (forecast or {}).get("lightning_outlook")
@@ -151,14 +152,14 @@ def _alerts_unavailable_storms(alerts, forecast, now, hours):
     if not outlook or (start is not None and start - now > timedelta(hours=hours)):
         return []
     return [_item("alerts_unavailable_storms", "NWS alerts unavailable — storms forecast",
-                  "This is not the same as no alerts. Tune NOAA Weather Radio.",
+                  f"This is not the same as no alerts. {tune}",
                   None, "weather.alerts", "alerts-unavailable-storms", "red")]
 
 
 NWS_ALERTS_SOURCE_ID = "source-nws-alerts"
 
 
-def _source_down(blocks):
+def _source_down(blocks, tune="Tune NOAA Weather Radio."):
     """One item per source that is stale, unavailable or in test mode.
 
     The NWS alerts block gets its own wording ("NWS alerts unavailable") and is
@@ -178,7 +179,7 @@ def _source_down(blocks):
         elif name == "weather.alerts":
             title = "NWS alerts out of date" if status == freshness.STALE else "NWS alerts unavailable"
             message = _join(message + "." if message and not message.endswith(".") else message,
-                            "Not the same as no alerts.")
+                            "Not the same as no alerts.", tune)
         elif status == freshness.STALE:
             title = f"{source} data is stale"
         else:
@@ -221,11 +222,13 @@ def build(propagation, weather, settings, now, acks=None):
     items += _nws_items(alerts)
     items += _detected_lightning(weather.get("lightning"))
     items += _forecast_lightning(forecast, now)
-    items += _alerts_unavailable_storms(alerts, forecast, now, t["storms_forecast_hours"])
+    # NWS alerts not current: name the weather radio station to tune (contract section 5).
+    tune = tune_words(weather.get("weather_radio"))
+    items += _alerts_unavailable_storms(alerts, forecast, now, t["storms_forecast_hours"], tune)
     items += _source_down([("propagation", propagation), ("weather.alerts", alerts),
                            ("weather.conditions", weather.get("conditions")),
                            ("weather.lightning", weather.get("lightning")),
-                           ("weather.forecast", forecast)])
+                           ("weather.forecast", forecast)], tune)
     prop_items, good = _propagation(propagation, t)
     items += prop_items
     if not any(i["tier"] == "card" for i in items):

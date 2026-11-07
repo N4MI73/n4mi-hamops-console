@@ -143,7 +143,7 @@ Weather is made of blocks that age separately, each with its own freshness field
   "alerts":     {"status": "ok", "source": "Weather Sentinel", "...": "...", "items": []},
   "conditions": {"status": "ok", "source": "Weather Sentinel", "...": "..."},
   "lightning":  {"status": "ok", "source": "Weather Sentinel", "...": "..."},
-  "weather_radio": null,
+  "weather_radio": {"status": "ok", "source": "NWS NWR listing (stored on the Pi)", "...": "..."},
   "forecast":   {"status": "ok", "source": "NWS", "...": "..."}
 }
 ```
@@ -262,23 +262,30 @@ The word lists live in one file in the service.
 
 **In Sentinel's simulation:** `status` is `test`, every flag is `null`, and simulated strikes never start a hold.
 
-### NOAA Weather Radio (`weather_radio`; not built yet, `null`)
+### NOAA Weather Radio (`weather_radio`, both modes; built 7 November 2026)
 
 ```json
 "weather_radio": {
-  "status": "ok", "source": "NWS NWR listing (stored on the Pi)", "fetched_at": "...", "issued_at": "...", "age_sec": 0, "message": null,
+  "status": "ok", "source": "NWS NWR listing (stored on the Pi)", "fetched_at": "2026-11-07T15:00:00Z", "issued_at": null, "age_sec": 3600, "message": null,
   "county": "Example County, VA", "same_code": "051000",
   "nearest": [
     {"callsign": "WXX00", "frequency_mhz": 162.550, "site": "Example City", "distance_mi": 18.2,
-     "covers_county": true, "status": "NORMAL"}
+     "covers_county": true, "county_part": null, "status": "NORMAL"}
   ]
 }
 ```
 
 - Which NOAA Weather Radio transmitter to tune for the console's location, and the county's SAME code for programming a weather radio.
-- **Stored on the Pi**, so it works in the field with no internet; refreshed from NWS (`https://www.weather.gov/source/nwr/JS/CCL.js`) when online, at most daily.
-- The "NWS alerts UNAVAILABLE" message names the station: "Tune NOAA Weather Radio WXX00, 162.550 MHz".
-- Out-of-service transmitters are shown as such and never recommended.
+- **Stored on the Pi** (`~/.local/state/hamops-console/nwr_stations.json`, a compact copy), so it works in the field with no internet. Downloaded from NWS (`https://www.weather.gov/source/nwr/JS/CCL.js`, about 2.5 MB) in the background when there is no copy yet, then at most once a day; a failed download keeps the stored copy and is retried after an hour. `fetched_at` is when the stored copy was downloaded. The block is `stale` when the copy is over 30 days old (still shown) and `unavailable` only when there is no copy yet or the station grid isn't valid.
+- **County:** from the NWS points lookup the forecast already makes (`location.nws_county`, e.g. `VAC059` → SAME `051059`). `same_code` is the whole-county code. Until NWS has answered at this location, `county` and `same_code` are `null`.
+- **`nearest`** (the first entry is the one to tune; distances from the centre of the station grid):
+  1. Transmitters NWS lists for the county, working before degraded, nearest first (`covers_county: true`). A transmitter not listed for the county doesn't carry its SAME-coded warnings, so a listed one comes first even when another is nearer.
+  2. When none of those is working, the three nearest working transmitters (`covers_county: false`), then the county's out-of-service ones, shown as such.
+  3. With no county known yet, the three nearest working transmitters (`covers_county: null`).
+  - `county_part` is NWS's note on which part of the county a transmitter covers (e.g. "NW 1/2"), or `null`. `status` is NWS's NORMAL, DEGRADED or OUT OF SERVICE.
+  - **Out-of-service transmitters are shown as such and never come first.**
+  - `message` explains cases 2 and 3 ("The county's own transmitter is out of service", "NWS lists no weather radio coverage for this county", "County not known yet: nearest transmitters, county coverage not confirmed").
+- The NWS-alerts outage cards (§6) name the station: "… Not the same as no alerts. Tune NOAA Weather Radio WXX00, 162.550 MHz." They name it only when the first entry is working and isn't marked `covers_county: false`; otherwise they say "Tune NOAA Weather Radio."
 
 ### Forecast (`forecast`, both modes)
 
@@ -522,4 +529,4 @@ Until Phase 3, in Field Mode the alerts and conditions blocks are `unavailable` 
 - **Wi-Fi networks from the touchscreen**, with Field Mode (Phase 3). Mockups approved 5 November (Wi-Fi tab with saved networks in preference order and nearby networks; join screen with on-screen keyboard). Needs a narrow polkit rule letting user `hamops` save, join and scan Wi-Fi (checked on the Pi 5 November).
 - **Settings in tabs** (approved 5 November): Station & profile (Data source, station, Operating profile, Field Day times, economy mode) · Display · Data sources · Wi-Fi.
 - **Main clock, UTC or local first** (open, 5 November): a Display-tab setting is drawn as a proposal; tapping the large time to swap the two is the alternative to weigh. Default stays UTC first.
-- **`POST /api/power`** with the Shut down dialog, and the **NOAA Weather Radio** block.
+- **`POST /api/power`** with the Shut down dialog. (The **NOAA Weather Radio** block was built 7 November 2026, §5.)

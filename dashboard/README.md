@@ -11,6 +11,6 @@ The touchscreen page shown fullscreen by Chromium on the Pi (1280 × 720, the To
 | `fonts/` | Barlow and Barlow Condensed, bundled so the screen looks the same in the field with no internet. SIL Open Font License (`fonts/OFL.txt`) |
 | `check.html` | The plain service check page, served at `/check`, for diagnostics |
 
-**Not built yet:** the Propagation, Alerts and System detail pages, Settings, Sleep, Help and Shut down. Their buttons are in place, dimmed and marked "Coming". The Weather page's NOAA Weather Radio panel says "Station list not loaded yet" until the stored transmitter list is built.
+**Not built yet:** the Propagation, Alerts and System detail pages, Settings, Sleep, Help and Shut down. Their buttons are in place, dimmed and marked "Coming". The Weather page's NOAA Weather Radio panel says "Station list not loaded yet" until the service has downloaded the NWS transmitter list once (it then works offline), and shows in amber when the transmitter isn't confirmed for the county.
 
 Display rules from the approved design: stale data loses its colour and shows "STALE · N MIN"; unavailable NWS alerts never read as "no alerts"; every colour comes with a word.

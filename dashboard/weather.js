@@ -158,16 +158,22 @@ function renderRadio() {
   const pick = r && r.status !== "unavailable" && (r.nearest || []).find(s => s.status !== "OUT OF SERVICE");
   tile.classList.toggle("not-loaded", !pick);
   if (!pick) {
-    // The stored NOAA Weather Radio list isn't built yet (next package): say so plainly.
-    $("nwr-freq").textContent = r ? "Station unknown" : "Station list not loaded yet";
-    $("nwr-station").textContent = r ? ((r && r.message) || "No working transmitter found") : "Coming in the next update";
+    // No stored list yet (first download pending or failed), or no working transmitter.
+    $("nwr-freq").textContent = (r && r.fetched_at) ? "Station unknown" : "Station list not loaded yet";
+    $("nwr-station").textContent = (r && r.message) || "No working transmitter found";
     $("nwr-same").textContent = "";
     return;
   }
   $("nwr-freq").textContent = `${pick.frequency_mhz.toFixed(3)} MHz`;
   $("nwr-station").textContent = [pick.callsign, pick.site, pick.distance_mi !== null ? `${Math.round(pick.distance_mi)} mi` : null]
     .filter(Boolean).join(" · ");
-  $("nwr-same").textContent = r.same_code ? `County SAME code ${r.same_code}` : "";
+  // Only a transmitter NWS lists for the county carries its SAME-coded warnings:
+  // say so when that isn't confirmed.
+  const line = pick.covers_county === true ? (r.same_code ? `County SAME code ${r.same_code}` : "")
+    : pick.covers_county === false ? ["Not listed for county", r.same_code && `SAME ${r.same_code}`].filter(Boolean).join(" · ")
+    : "County not known yet";
+  $("nwr-same").textContent = line;
+  $("nwr-same").classList.toggle("unconfirmed", pick.covers_county !== true);
 }
 
 // ----------------------------------------------------------------- Forecast and hours
