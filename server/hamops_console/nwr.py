@@ -27,8 +27,9 @@ Choosing the transmitter (2026-11-07; Dan to validate the radio side):
   1. Transmitters NWS lists for the location's county come first, working
      ones before degraded, nearest first. A transmitter that isn't listed for
      the county won't carry that county's SAME-coded warnings.
-  2. If none of those is working, the nearest working transmitters follow,
-     marked `covers_county: false`.
+  2. Then the nearest other working transmitters, marked
+     `covers_county: false`, so there are always three to try (alternates if
+     the first can't be heard; first in the list if the county has none working).
   3. Out-of-service transmitters may be listed (as such) but never come first.
   4. With no county known yet (NWS hasn't answered at this location), the
      nearest working transmitters are listed with `covers_county: null`.
@@ -161,13 +162,13 @@ def choose(data, lat, lon, zone):
                      if call not in names and t["status"] != OUT),
                     key=lambda e: (STATUS_RANK.get(e["status"], 1), e["distance_mi"]))
 
+    # The county's working transmitters, then the nearest other working ones as
+    # alternates if the first can't be heard (Dan, 2026-11-07), then up to two of
+    # the county's out-of-service ones, shown as such.
+    nearest = (working_listed + others)[:NEAREST] + [e for e in listed if e["status"] == OUT][:2]
     if working_listed:
-        nearest = (working_listed + [e for e in listed if e["status"] == OUT])[:NEAREST]
         message = None
     else:
-        # Nothing working for the county: the nearest working ones, then any
-        # out-of-service county transmitter shown as such.
-        nearest = others[:NEAREST] + listed[:2]
         if county is None:
             message = ("County not known yet: nearest transmitters, county coverage not confirmed"
                        if not zone else "County not in the NWS weather radio list: nearest transmitters")

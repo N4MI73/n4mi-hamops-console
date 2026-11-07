@@ -153,16 +153,21 @@ class Choose(Small):
         self.assertEqual((county, same), ("Loudoun, VA", "051107"))
         self.assertEqual(nearest[0]["callsign"], "WXM42")
         self.assertEqual(nearest[0]["county_part"], "NW 1/2")
+        # Only one listed for the county: the two nearest others follow as alternates.
+        self.assertEqual([(e["callsign"], e["covers_county"]) for e in nearest],
+                         [("WXM42", True), ("WNG736", False), ("KHB36", False)])
 
     def test_degraded_after_working_and_out_of_service_never_first(self):
         data = nwr.parse(ccl(with_status("WNG736", "OUT OF SERVICE")))
         _, _, nearest, message = self.pick("DCC001", data)
-        self.assertEqual([e["callsign"] for e in nearest], ["KHB36", "KEC83", "WNG736"])
+        # The county's two working ones, the nearest other as a third choice, then the dead one.
+        self.assertEqual([e["callsign"] for e in nearest], ["KHB36", "KEC83", "WXM42", "WNG736"])
+        self.assertIs(nearest[2]["covers_county"], False)
         self.assertEqual(nearest[-1]["status"], "OUT OF SERVICE")
         self.assertIsNone(message)
         data = nwr.parse(ccl(with_status("KHB36", "DEGRADED")))
         _, _, nearest, _ = self.pick("VAC059", data)
-        self.assertEqual([e["callsign"] for e in nearest], ["WNG736", "KHB36"])
+        self.assertEqual([e["callsign"] for e in nearest], ["WNG736", "KHB36", "KEC83"])
 
     def test_county_transmitter_out_of_service_falls_back_to_nearest_working(self):
         data = nwr.parse(ccl(with_status("WXM42", "OUT OF SERVICE")))

@@ -176,6 +176,7 @@ function renderRadio() {
     $("nwr-freq").textContent = (r && r.fetched_at) ? "Station unknown" : "Station list not loaded yet";
     $("nwr-station").textContent = (r && r.message) || "No working transmitter found";
     $("nwr-same").textContent = "";
+    $("nwr-also").textContent = "";
     return;
   }
   $("nwr-freq").textContent = `${pick.frequency_mhz.toFixed(3)} MHz`;
@@ -188,6 +189,10 @@ function renderRadio() {
     : "County not known yet";
   $("nwr-same").textContent = line;
   $("nwr-same").classList.toggle("unconfirmed", pick.covers_county !== true);
+  // If the first can't be heard: the next two working ones, frequency first (what you dial).
+  const also = (r.nearest || []).filter(s => s !== pick && s.status !== "OUT OF SERVICE").slice(0, 2);
+  $("nwr-also").textContent = also.length
+    ? "Or " + also.map(s => `${s.frequency_mhz.toFixed(3)} ${s.callsign}`).join(" · ") : "";
 }
 
 // ----------------------------------------------------------------- Forecast and hours

@@ -281,8 +281,9 @@ The word lists live in one file in the service.
 - **County:** from the NWS points lookup the forecast already makes (`location.nws_county`, e.g. `VAC059` → SAME `051059`). `same_code` is the whole-county code. Until NWS has answered at this location, `county` and `same_code` are `null`.
 - **`nearest`** (the first entry is the one to tune; distances from the centre of the station grid):
   1. Transmitters NWS lists for the county, working before degraded, nearest first (`covers_county: true`). A transmitter not listed for the county doesn't carry its SAME-coded warnings, so a listed one comes first even when another is nearer.
-  2. When none of those is working, the three nearest working transmitters (`covers_county: false`), then the county's out-of-service ones, shown as such.
-  3. With no county known yet, the three nearest working transmitters (`covers_county: null`).
+  2. Then the nearest other working transmitters (`covers_county: false`), so there are always three working ones to try: alternates if the first can't be heard, or first in the list when the county has none working (Dan, 7 November 2026). Then up to two of the county's out-of-service ones, shown as such.
+  3. With no county known yet, the three nearest working transmitters (`covers_county: null`). This works offline: the stored list has each transmitter's position.
+  - The Weather page shows the first entry large and the next two working ones on one line: "Or 162.550 WXX01 · 162.400 WXX02".
   - `county_part` is NWS's note on which part of the county a transmitter covers (e.g. "NW 1/2"), or `null`. `status` is NWS's NORMAL, DEGRADED or OUT OF SERVICE.
   - **Out-of-service transmitters are shown as such and never come first.**
   - `message` explains cases 2 and 3 ("The county's own transmitter is out of service", "NWS lists no weather radio coverage for this county", "County not known yet: nearest transmitters, county coverage not confirmed").

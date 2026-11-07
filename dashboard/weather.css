@@ -29,9 +29,11 @@
 .wx-now .small, .wx-radio .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile.is-stale .now-main { color: var(--grey); }
 #now-extra.unavailable { color: var(--bad); font-weight: 600; white-space: normal; }
-.wx-top .wx-radio { gap: 4px; }
+.wx-top .wx-radio { gap: 2px; padding-left: 14px; padding-right: 12px; }
 .wx-radio > * { flex-shrink: 0; }
-.freq { font-size: 36px; line-height: 1.05; margin-bottom: 2px; }
+.freq { font-size: 32px; line-height: 1; }
+.radio-line { line-height: 1.15; }
+#nwr-also { color: var(--muted); }
 .radio-line { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wx-radio .small.unconfirmed { color: var(--fair-label); }
 .wx-radio.not-loaded .freq { font-family: "Barlow", sans-serif; font-size: 22px; font-weight: 600; color: var(--ink-2); line-height: 1.2; }
