@@ -2,7 +2,7 @@
 
 PropMon's server is owned by Ham Shack Automation (code in n4mi-shack-server;
 the PropMon ESP32 display's firmware is N4MI Desktop Instrument Series). Since
-2026-11-08 the console reads PropMon's v2 endpoint, `/api/v2/conditions`,
+2026-11-07 the console reads PropMon's v2 endpoint, `/api/v2/conditions`,
 which only gains fields (renames or removals are checked with this project
 first). This module only reads it and translates it to the console's contract:
   - `status` per band becomes `rating` ("status" now means freshness);

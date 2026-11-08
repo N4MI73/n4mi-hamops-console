@@ -59,7 +59,7 @@ The rules, in order:
 
 | Block | Fetched every | Stale after | Unavailable after | Notes |
 |---|---|---|---|---|
-| Propagation | 5 min (`propagation_fetch_min`) | 15 min (30 until 8 November 2026) | — | Fetched only when asked, at most this often; PropMon's own `updated` is the age |
+| Propagation | 5 min (`propagation_fetch_min`) | 15 min (30 until 7 November 2026) | — | Fetched only when asked, at most this often; PropMon's own `updated` is the age |
 | NWS alerts, Home | with the Sentinel fetch, 1 min (`sentinel_fetch_min`) | 10 min | 30 min (`nws_alerts_unavailable_min`) | Aged by when Sentinel last reached NWS (`last_polled_at`), not by whether Sentinel answers |
 | NWS alerts, Field | 2 min | 10 min | 30 min | Phase 3 |
 | Local conditions, Home (Tempest) | 1 min | 5 min, or at once if Sentinel says `available: false` | — | |
@@ -128,7 +128,7 @@ Errors from `POST`/`PUT` endpoints are JSON: `{"error": "..."}` or, for settings
 - **Band order:** good, then fair, then poor, then unknown; within each, lowest frequency first. The service sends `bands` already in this order.
 - PropMon's `alerts[]` and `tower_status` are not used.
 
-**Changed 8 November 2026: PropMon v2.** PropMon's server is owned by Ham Shack Automation; at its owner's request and Dan's decision the console now reads **`GET <propmon_url>/api/v2/conditions`** (v1, `/api/instrument/propagation`, stays frozen for the ESP32 instrument and DXMon). v2 only gains fields; renames and removals are checked with this project first. Designed from the live reply of 7 November 2026 (a G1 storm). New fields in the block, all present in every reply:
+**Changed 7 November 2026: PropMon v2.** PropMon's server is owned by Ham Shack Automation; at its owner's request and Dan's decision the console now reads **`GET <propmon_url>/api/v2/conditions`** (v1, `/api/instrument/propagation`, stays frozen for the ESP32 instrument and DXMon). v2 only gains fields; renames and removals are checked with this project first. Designed from the live reply of 7 November 2026 (a G1 storm). New fields in the block, all present in every reply:
 
 ```json
     "ratings_available": true,
