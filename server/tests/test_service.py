@@ -268,8 +268,32 @@ class SystemInfo(unittest.TestCase):
     def test_block_runs_anywhere(self):
         b = system_info.block("0.1.0", T0)
         self.assertEqual(b["status"], "ok")
-        for key in ("hostname", "cpu_temp_c", "memory_used_pct", "power", "network", "clock", "gps"):
+        for key in ("hostname", "cpu_temp_c", "memory_used_pct", "memory_used_gb", "memory_total_gb",
+                    "power", "network", "clock", "rtc", "gps"):
             self.assertIn(key, b)
+        self.assertIn("wifi_signal_pct", b["network"])
+
+    def test_memory(self):
+        text = "MemTotal:        8245760 kB\nMemFree:         100000 kB\nMemAvailable:    7421184 kB\n"
+        self.assertEqual(system_info.memory(text), (10, 0.8, 7.9))
+        self.assertEqual(system_info.memory("junk"), (None, None, None))
+
+    def test_wifi_signal_from_last_scan(self):
+        self.assertEqual(system_info.wifi_signal(" :40\n*:72\n :18\n"), 72)
+        self.assertIsNone(system_info.wifi_signal(" :40\n"))
+        self.assertIsNone(system_info.wifi_signal(""))
+
+    def test_rtc_battery(self):
+        folder = tempfile.mkdtemp()
+        with open(os.path.join(folder, "battery_voltage"), "w") as f:
+            f.write("2985000\n")
+        with open(os.path.join(folder, "charging_voltage"), "w") as f:
+            f.write("3000000\n")
+        self.assertEqual(system_info.rtc(folder), {"battery_v": 2.98, "charging": True})
+        with open(os.path.join(folder, "charging_voltage"), "w") as f:
+            f.write("0\n")
+        self.assertFalse(system_info.rtc(folder)["charging"])
+        self.assertEqual(system_info.rtc(tempfile.mkdtemp()), {"battery_v": None, "charging": None})
 
 
 class Endpoints(unittest.TestCase):

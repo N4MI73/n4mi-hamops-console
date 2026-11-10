@@ -34,7 +34,7 @@ Every data block carries the same freshness fields (`status`: ok / stale / unava
 | `settings_api.py` | Checks a settings change, saves it to the settings file on the Pi (keeping comments and anything else in the file; written to a new copy and swapped in, so a power cut can't leave a half-written file), and runs Test connections. The service rewrites the file in its own layout when you save from the screen |
 | `alerts.py` | Builds the ranked alert list (the one place ranking is decided) and keeps Acknowledge in `~/.local/state/hamops-console/acks.json` on the Pi, so a restart doesn't make an acknowledged warning flash again; entries older than 48 h are dropped. Also remembers NWS alerts that ended in the last 24 hours, for the Alerts page (`ended.json` in the same folder; nothing is concluded while the NWS list is out of date) |
 | `alert_classes.py` | The one place that classifies an NWS product: warning/watch/advisory/statement, and hazard to the site (site hazard, temperature, other) |
-| `system_info.py` | Readings from the Pi; each is `null` on a machine that isn't a Pi |
+| `system_info.py` | Readings from the Pi (temperature, load, memory, disk, power flags, network and Wi-Fi signal, clock, the RTC backup battery, GPS present); each is `null` on a machine that isn't a Pi |
 | `nws_text.py` | Short "what" and "hazard" lines from NWS alert text (ported from Weather Sentinel) |
 | `app.py`, `__main__.py` | The Flask app and its start-up |
 

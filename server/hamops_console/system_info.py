@@ -6,8 +6,13 @@ never an exception, so the service runs anywhere.
 
 GPS details come from gpsd in a later step; for now `gps` reports whether the
 receiver is plugged in.
+
+2026-11-10, for the System page: memory in GB, the Wi-Fi signal (from
+NetworkManager's last scan, never starting a new one) and the real-time
+clock's backup battery.
 """
 
+import glob
 import os
 import shutil
 import socket
@@ -63,10 +68,11 @@ def throttle_flags(text=None):
     }
 
 
-def memory_used_pct():
-    text = _read("/proc/meminfo")
+def memory(text=None):
+    """(used %, used GB, total GB) from /proc/meminfo; Nones if unreadable."""
+    text = text if text is not None else _read("/proc/meminfo")
     if not text:
-        return None
+        return None, None, None
     info = {}
     for line in text.splitlines():
         key, _, rest = line.partition(":")
@@ -75,8 +81,10 @@ def memory_used_pct():
             info[key] = int(parts[0])
     total, available = info.get("MemTotal"), info.get("MemAvailable")
     if not total or available is None:
-        return None
-    return round(100 * (total - available) / total)
+        return None, None, None
+    kib_per_gb = 1024 ** 2
+    return (round(100 * (total - available) / total), round((total - available) / kib_per_gb, 1),
+            round(total / kib_per_gb, 1))
 
 
 def uptime_sec():
@@ -123,7 +131,42 @@ def network():
             ip = s.getsockname()[0]
     except OSError:
         pass
-    return {"interface": device, "connection": name, "ip": ip}
+    return {"interface": device, "connection": name, "ip": ip,
+            "wifi_signal_pct": wifi_signal() if device and device.startswith("wl") else None}
+
+
+def wifi_signal(text=None):
+    """Signal (0-100) of the Wi-Fi network in use, from NetworkManager's last
+    scan list. `--rescan no` so reading it never starts a scan (scanning needs
+    a permission the service doesn't have, and costs radio time)."""
+    text = text if text is not None else _run(
+        ["nmcli", "-t", "-f", "IN-USE,SIGNAL", "device", "wifi", "list", "--rescan", "no"])
+    for line in (text or "").splitlines():
+        in_use, _, signal = line.partition(":")
+        if in_use.strip() == "*" and signal.strip().isdigit():
+            return int(signal)
+    return None
+
+
+RTC_GLOB = "/sys/devices/platform/soc*/*rpi_rtc/rtc/rtc0"
+
+
+def rtc(base=None):
+    """The real-time clock's backup battery: voltage and whether charging is
+    on. Pi 5 only (on Trixie the folder is under soc@107c000000, so it's found
+    with a pattern rather than a fixed path). Values are in microvolts."""
+    folders = [base] if base else glob.glob(RTC_GLOB)
+    for folder in folders:
+        def volts(name):
+            raw = _read(os.path.join(folder, name))
+            try:
+                return round(int(raw) / 1_000_000, 2)
+            except (TypeError, ValueError):
+                return None
+        battery, charging = volts("battery_voltage"), volts("charging_voltage")
+        if battery is not None or charging is not None:
+            return {"battery_v": battery, "charging": None if charging is None else charging > 0}
+    return {"battery_v": None, "charging": None}
 
 
 def clock():
@@ -142,18 +185,22 @@ def gps():
 def block(version, started_at, now=None):
     now = now or freshness.utcnow()
     used, total = disk()
+    mem_pct, mem_used, mem_total = memory()
     out = freshness.block(SOURCE, now, None, 60, now=now)
     out.update({
         "hostname": socket.gethostname(),
         "uptime_sec": uptime_sec(),
         "cpu_temp_c": cpu_temp_c(),
         "cpu_load_pct": cpu_load_pct(),
-        "memory_used_pct": memory_used_pct(),
+        "memory_used_pct": mem_pct,
+        "memory_used_gb": mem_used,
+        "memory_total_gb": mem_total,
         "disk_used_gb": used,
         "disk_total_gb": total,
         "power": throttle_flags(),
         "network": network(),
         "clock": clock(),
+        "rtc": rtc(),
         "gps": gps(),
         "service": {"version": version, "started_at": freshness.iso(started_at)},
     })

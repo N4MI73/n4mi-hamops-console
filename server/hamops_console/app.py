@@ -4,7 +4,8 @@ Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather, /api/alerts,
 /api/system, POST /api/alerts/ack and /api/alerts/clear-hold, and
 GET/PUT /api/settings with POST /api/settings/test. 2026-11-07: POST
 /api/weather-radio/refresh. 2026-11-10: the Alerts page (/alerts), and
-/api/alerts also lists NWS alerts ended in the last 24 hours.
+/api/alerts also lists NWS alerts ended in the last 24 hours. The System page
+(/system).
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -59,6 +60,11 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
     def alerts_page():
         """The Alerts detail page (approved mockup "Alerts page")."""
         return send_from_directory(dashboard_dir, "alerts.html")
+
+    @app.get("/system")
+    def system_page():
+        """The System detail page (approved mockup "System page")."""
+        return send_from_directory(dashboard_dir, "system.html")
 
     @app.get("/check")
     def check_page():

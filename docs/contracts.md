@@ -442,12 +442,12 @@ No body. Ends both lightning holds early, on the operator's word, until the next
     "uptime_sec": 86400,
     "cpu_temp_c": 48.3,
     "cpu_load_pct": 6,
-    "memory_used_pct": 14,
+    "memory_used_pct": 14, "memory_used_gb": 1.1, "memory_total_gb": 7.9,
     "disk_used_gb": 4.5, "disk_total_gb": 457,
     "power": {"undervoltage_now": false, "throttled_now": false, "undervoltage_since_boot": false},
-    "network": {"interface": "wlan0", "connection": "home-wifi", "ip": "192.0.2.10",
-                "internet": true, "home_sources_reachable": true},
+    "network": {"interface": "wlan0", "connection": "home-wifi", "ip": "192.0.2.10", "wifi_signal_pct": 68},
     "clock": {"source": "ntp", "synced": true},
+    "rtc": {"battery_v": 2.98, "charging": true},
     "gps": {"present": true, "fix": "3d", "satellites_used": 4, "satellites_seen": 12,
             "grid": "FM18lv", "last_fix_at": "2026-11-01T14:52:05Z"},
     "service": {"version": "0.1.0", "started_at": "2026-10-31T14:52:10Z"}
@@ -459,6 +459,8 @@ No body. Ends both lightning holds early, on the operator's word, until the next
 - `network.connection` is the NetworkManager profile name (e.g. `hotspot` in the field), never a password.
 - `clock.source` is `ntp`, `gps` or `rtc`. GPS time is used only when it's plausible against the RTC.
 - Readings the service can't take (e.g. off the Pi) are `null`.
+- **Changed 10 November 2026 (System page):** added `memory_used_gb` / `memory_total_gb`, `network.wifi_signal_pct` (0–100, from NetworkManager's last scan with `--rescan no`, so reading it never starts a scan; `null` off Wi-Fi) and `rtc` (the Pi 5's real-time-clock backup battery: `battery_v` in volts and whether `charging` is on, read from the RTC's sysfs folder). `network.internet` and `network.home_sources_reachable`, drawn in earlier drafts, were never built: the screens judge the internet by whether NWS answers (the forecast block) and the home sources by their own blocks.
+- **The System page** (approved mockup "System page") shows three tiles: THIS PI (CPU temperature, amber "warm" from 75 °C and red "hot" from 80 °C, where the Pi 5 starts slowing itself down; load; memory; disk; power from `vcgencmd`, red for under-voltage now, amber for throttling or under-voltage since boot; uptime; version and when the service started), NETWORK · LOCATION · TIME (Wi-Fi profile and signal; internet, judged by whether NWS answers; location source and grid; GPS; clock; backup-clock battery) and DATA SOURCES (PropMon, Weather Sentinel — the worst of its three blocks — the console service, the NWS forecast and the stored weather radio list, each with its age or its state and reason). Its System button is live on every screen.
 
 ---
 

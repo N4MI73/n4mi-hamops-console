@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>Ham Ops Console · System</title>
+<link rel="stylesheet" href="/static/home.css">
+<link rel="stylesheet" href="/static/system.css">
+</head>
+<body data-page="system">
+<!-- Ham Ops Console -- System page, built from the approved mockup "System page"
+     (2026-10-12): this Pi's own readings, its network, location and clocks, and the
+     state of each data source. Readings come from the console service on this Pi
+     (/api/system); see common.js and system.js. -->
+<div class="screen">
+
+  <header class="status-bar">
+    <div class="clock"><span class="utc num" id="utc">--:--Z</span><span class="local" id="local">--</span></div>
+    <span class="mode-tag" id="mode">--</span>
+    <span class="station" id="station">--</span>
+    <div class="spacer"></div>
+    <div class="pills">
+      <span class="pill" id="pill-internet"><span class="dot"></span>Internet</span>
+      <span class="pill" id="pill-nas"><span class="dot"></span>NAS</span>
+      <span class="pill" id="pill-gps"><span class="dot"></span><span class="label">GPS</span></span>
+    </div>
+  </header>
+
+  <nav class="modules" aria-label="Modules">
+    <button data-href="/">Home</button>
+    <button data-href="/propagation">Propagation</button>
+    <button data-href="/weather">Weather</button>
+    <button data-href="/alerts" id="alerts-button">Alerts<span class="badge" id="badge" hidden></span></button>
+    <button class="current" aria-current="page">System</button>
+  </nav>
+
+  <div class="sy-body">
+
+    <section class="tile" id="t-pi" aria-label="This Pi">
+      <div class="tile-head"><span class="name">THIS PI</span><span class="fresh" id="pi-fresh">--</span></div>
+      <dl class="sy-facts" id="pi-facts"></dl>
+      <span class="small sy-foot" id="pi-foot">--</span>
+    </section>
+
+    <section class="tile" id="t-net" aria-label="Network, location and time">
+      <div class="tile-head"><span class="name">NETWORK · LOCATION · TIME</span></div>
+      <dl class="sy-facts" id="net-facts"></dl>
+    </section>
+
+    <section class="tile" id="t-src" aria-label="Data sources">
+      <div class="tile-head"><span class="name" id="src-title">DATA SOURCES</span></div>
+      <div class="sources" id="sources"></div>
+    </section>
+
+  </div>
+
+  <footer class="toolbar">
+    <button id="refresh">Refresh</button>
+    <button disabled>Settings<span class="soon">Coming</span></button>
+    <button disabled>Sleep<span class="soon">Coming</span></button>
+    <button disabled>Help<span class="soon">Coming</span></button>
+    <div class="spacer"></div>
+    <button class="shutdown" disabled>Shut down…<span class="soon">Coming</span></button>
+  </footer>
+
+</div>
+<div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
+<script src="/static/common.js"></script>
+<script src="/static/system.js"></script>
+</body>
+</html>
