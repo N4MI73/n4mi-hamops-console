@@ -316,8 +316,10 @@ class Endpoints(unittest.TestCase):
 
         w = weather([nws("Tornado Warning", "warning", "site_hazard", id_="urn:tor", expires="2099-01-01T00:00:00Z")])
         self.store = alerts.AckStore(os.path.join(tempfile.mkdtemp(), "acks.json"))
-        self.client = create_app(SETTINGS, propagation=Fixed(prop()), weather=Fixed(w), acks=self.store,
-                                 dashboard_dir=tempfile.mkdtemp()).test_client()
+        self.ended = alerts.EndedStore(os.path.join(tempfile.mkdtemp(), "ended.json"))
+        self.weather = Fixed(w)
+        self.client = create_app(SETTINGS, propagation=Fixed(prop()), weather=self.weather, acks=self.store,
+                                 ended=self.ended, dashboard_dir=tempfile.mkdtemp()).test_client()
 
     def test_get_and_ack(self):
         body = self.client.get("/api/alerts").get_json()
@@ -352,15 +354,92 @@ class Endpoints(unittest.TestCase):
 
         stormy = Stormy()
         client = create_app(SETTINGS, propagation=stormy, weather=stormy, acks=self.store,
-                            dashboard_dir=tempfile.mkdtemp()).test_client()
+                            ended=self.ended, dashboard_dir=tempfile.mkdtemp()).test_client()
         r = client.post("/api/alerts/clear-hold")
         self.assertEqual((r.status_code, r.get_json()), (200, {"cleared_at": "2026-11-01T14:52:00Z"}))
         self.assertEqual(stormy.cleared, [NOW])
+
+    def test_alerts_reply_carries_ended_list(self):
+        body = self.client.get("/api/alerts").get_json()
+        self.assertEqual((body["ended"], body["nws_alerts_status"]), ([], "ok"))
+        self.weather.value["alerts"]["items"] = []          # NWS ended the warning
+        body = self.client.get("/api/alerts").get_json()
+        self.assertEqual([e["title"] for e in body["ended"]], ["Tornado Warning"])
+        self.assertEqual(body["items"][0]["category"], "all_quiet")
 
     def test_bad_acks(self):
         self.assertEqual(self.client.post("/api/alerts/ack", json={"id": "urn:nope"}).status_code, 404)
         self.assertEqual(self.client.post("/api/alerts/ack", json={"x": 1}).status_code, 400)
         self.assertEqual(self.client.post("/api/alerts/ack", data="junk").status_code, 400)
+
+
+class EndedTest(unittest.TestCase):
+    """NWS alerts that ended in the last 24 hours (Alerts page)."""
+
+    def setUp(self):
+        self.clock = [NOW]
+        self.path = os.path.join(tempfile.mkdtemp(), "ended.json")
+        self.store = alerts.EndedStore(self.path, clock=lambda: self.clock[0])
+
+    def items(self, *nws_items, status="ok"):
+        return build(w=weather(nws_items, alerts_status=status))
+
+    def test_nws_items_carry_kind_and_instruction(self):
+        item = self.items(dict(nws("Tornado Watch", "watch", "site_hazard"), instruction="Be ready."))[0]
+        self.assertEqual((item["kind"], item["instruction"]), ("watch", "Be ready."))
+
+    def test_ended_early_uses_the_time_seen_gone(self):
+        watch = nws("Tornado Watch", "watch", "site_hazard", expires="2026-11-01T18:00:00Z")
+        self.assertEqual(self.store.observe(self.items(watch), "ok"), [])
+        self.clock[0] = NOW + timedelta(minutes=20)
+        ended = self.store.observe(self.items(), "ok")
+        self.assertEqual(len(ended), 1)
+        e = ended[0]
+        self.assertEqual((e["id"], e["title"], e["kind"], e["color"]),
+                         ("urn:test:Tornado Watch", "Tornado Watch", "watch", "yellow"))
+        self.assertEqual(e["ended_at"], "2026-11-01T15:12:00Z")
+
+    def test_expired_uses_its_expiry(self):
+        sws = nws("Special Weather Statement", "statement", "site_hazard", expires="2026-11-01T15:00:00Z")
+        self.store.observe(self.items(sws), "ok")
+        self.clock[0] = NOW + timedelta(hours=1)
+        self.assertEqual(self.store.observe(self.items(), "ok")[0]["ended_at"], "2026-11-01T15:00:00Z")
+
+    def test_nothing_concluded_while_nws_alerts_not_current(self):
+        warn = nws("Tornado Warning", "warning", "site_hazard", expires="2026-11-01T18:00:00Z")
+        self.store.observe(self.items(warn), "ok")
+        for status in ("stale", "unavailable", "test"):
+            self.assertEqual(self.store.observe([], status), [], status)
+        # Back to current and still there: never ended.
+        self.assertEqual(self.store.observe(self.items(warn), "ok"), [])
+
+    def test_extended_alert_leaves_the_ended_list(self):
+        warn = nws("Tornado Warning", "warning", "site_hazard", expires="2026-11-01T18:00:00Z")
+        self.store.observe(self.items(warn), "ok")
+        self.assertEqual(len(self.store.observe(self.items(), "ok")), 1)
+        self.assertEqual(self.store.observe(self.items(warn), "ok"), [])
+
+    def test_kept_24_hours_newest_first_and_survives_restart(self):
+        a = nws("Tornado Watch", "watch", "site_hazard", id_="urn:a", expires="2026-11-02T18:00:00Z")
+        b = nws("Wind Advisory", "advisory", "site_hazard", id_="urn:b", expires="2026-11-02T18:00:00Z")
+        self.store.observe(self.items(a, b), "ok")
+        self.store.observe(self.items(b), "ok")              # a ends now
+        self.clock[0] = NOW + timedelta(hours=2)
+        ended = self.store.observe(self.items(), "ok")       # b ends 2 h later
+        self.assertEqual([e["id"] for e in ended], ["urn:b", "urn:a"])
+        reloaded = alerts.EndedStore(self.path, clock=lambda: NOW + timedelta(hours=25))
+        self.assertEqual([e["id"] for e in reloaded.observe([], "ok")], ["urn:b"])
+
+    def test_non_nws_items_not_tracked(self):
+        lightning = dict(QUIET_LIGHTNING, within_10mi=True, closest_mi=8.0)
+        self.store.observe(build(w=weather(lightning=lightning)), "ok")
+        self.assertEqual(self.store.observe(build(), "ok"), [])
+        self.assertFalse(os.path.exists(self.path), "nothing to save")
+
+    def test_broken_file_is_empty(self):
+        with open(self.path, "w") as f:
+            f.write("{not json")
+        self.assertEqual(alerts.EndedStore(self.path).observe([], "ok"), [])
 
 
 if __name__ == "__main__":

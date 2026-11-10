@@ -359,6 +359,8 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
       "detail": "60 mph wind gusts and quarter size hail. Until 10:36 AM (15:36 UTC).",
       "since": null,
       "until": "2026-11-01T15:36:32Z",
+      "kind": "warning",
+      "instruction": "For your protection move to an interior room on the lowest floor of a building.",
       "ref": {"block": "weather.alerts", "id": "urn:oid:2.49.0.1.840.0.example"}
     },
     {
@@ -373,11 +375,18 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
       "since": "2026-11-01T14:51:32Z",
       "ref": {"block": "weather.lightning", "id": "lightning-5mi-2026-11-01T14:51:32Z"}
     }
-  ]
+  ],
+  "ended": [
+    {"id": "urn:oid:2.49.0.1.840.0.example2", "title": "Special Weather Statement", "category": "hazard_alert",
+     "kind": "statement", "color": "yellow", "until": "2026-11-01T14:30:00Z", "ended_at": "2026-11-01T14:10:00Z"}
+  ],
+  "nws_alerts_status": "ok"
 }
 ```
 
 - The Priority Card shows the first `card` item, with ‹ › and "1 of N" across the other card items. The Alerts page lists everything, card and badge items alike.
+- **Alerts page and the `ended` list (new 10 November 2026).** The reply also carries `"ended": [...]` and `"nws_alerts_status"` (the NWS alerts block's status: `ok`, `stale`, `unavailable` or `test`). `ended` holds NWS alerts that ended in the last 24 hours, newest first: `{"id", "title", "category", "kind", "color", "until", "ended_at"}`. An NWS alert counts as ended when it leaves the list **while the NWS alerts block is `ok`**; while it is stale, unavailable or in test mode nothing is concluded, because a missing alert there may simply not have been fetched, and the page says "Can't tell while NWS alerts are out of date." instead of "None". `ended_at` is the alert's own expiry if that has passed, otherwise when it was seen gone (NWS ended it early); an alert that comes back (extended) leaves `ended`. Kept on the Pi in `~/.local/state/hamops-console/ended.json`, so a restart doesn't forget it. NWS items (`ref.block` `weather.alerts`) also carry `kind` (`warning`, `watch`, `advisory`, `statement`), for the page's label, and `instruction` (NWS's advice, or `null`), for its Details panel.
+- **The Alerts page** (approved mockup "Alerts page") draws three lists: the `card` items worst first (label, title with the NWS "until" time, a line naming the source, Acknowledge on unacknowledged critical items, Details on each); the `badge` items, marked "new" until the page has shown them once; and `ended`. Details opens a panel with the full detail text, NWS's instruction, the from/until times in local and UTC, Acknowledge, and the two-tap Clear hold for lightning items. Every label is a word as well as a colour (CRITICAL, WATCH, ADVISORY, STATEMENT, NWS DOWN, LOCAL, FORECAST, SOURCE, TEST, BANDS, QUIET, HEAT, COLD, WARNING). When the NWS list is out of date, its items say "NWS list out of date". The list scrolls with a finger when it doesn't fit. The Alerts button on every screen opens it.
 - **`until` (new 7 November 2026):** NWS alert items only (`ref.block` `weather.alerts`) carry the alert's NWS expiry, or `null`, so the Weather page can show a short "Until 3:04 PM" line instead of the full detail. Other items have no `until` key.
 - **Detail pages go back to Home (proposed 7 November 2026, with the Weather page; Dan to confirm on the Pi):** after 3 minutes untouched, and at once when a new unacknowledged critical item arrives, so a warning is never hidden behind a detail page. Each critical item does this once: one already shown on the Home screen, or already sent Home for, doesn't bounce the operator back again. Screen behaviour only.
 - **Rotation (changed 5 November 2026; replaces "no auto-scroll"):** with no critical item in the list, the card moves to the next card item every 60 seconds and wraps round. A critical item (always ranked first) pins the card on it until it ends, even after Acknowledge; with two, it stays on the worse one. ‹ › still page; touching them pauses rotation, and 30 seconds after the last touch the card returns to the first item and rotation carries on. A single item, or "All quiet.", never rotates. A new first item jumps to the front. This is screen behaviour; the service's ranking is unchanged by it.

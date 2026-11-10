@@ -1,0 +1,87 @@
+/* Ham Ops Console -- Alerts page (approved mockup "Alerts page", 2026-10-12, updated 2026-11-01).
+   Uses home.css for the shared parts (fonts, colours, status bar, module row, toolbar, the
+   Acknowledge and Clear buttons). Text stays at 16 px or larger. When there are more items than
+   fit, the list scrolls with a finger; the section headings stay with their lists. */
+
+.al-body {
+  flex-grow: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 14px 18px;
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
+}
+.al-head { font-size: 16px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); flex-shrink: 0; }
+.al-head + .al-list, .al-head + .al-ended { margin-bottom: 6px; }
+.al-list, .al-ended { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.al-none { font-size: 19px; color: var(--muted); padding: 4px 2px; }
+.al-none.warn { color: var(--fair-label); }
+
+/* -- one row: label, title and line under it, buttons */
+.row {
+  height: 66px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 12px 0 14px;
+  border-radius: 10px; border: 1px solid var(--panel-line); background: var(--well);
+}
+.row.badge-row { height: 56px; }
+.row .text { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.row .title { font-size: 23px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.badge-row .title { font-size: 21px; }
+.row .sub { font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .act { min-width: 180px; height: 56px; font-size: 20px; }
+.row .more {
+  min-width: 110px; height: 56px; flex-shrink: 0; font-size: 19px; font-weight: 600; color: var(--ink);
+  background: rgba(0, 0, 0, 0.3); border: 1px solid var(--panel-line); border-radius: 10px;
+}
+
+.tag {
+  width: 124px; flex-shrink: 0; text-align: center; padding: 6px 0; font-size: 15px; font-weight: 700;
+  letter-spacing: 0.08em; border-radius: 6px; border: 1px solid transparent;
+}
+/* Colours come with words, never alone (approved design). Solid labels for NWS products and
+   critical items; outlined for local detection, forecasts, sources and propagation. */
+.row.red { background: #2B1312; border-color: #C2453E; } .row.red .sub { color: #E3B9B5; }
+.row.yellow { background: #221A0C; border-color: #8A6A22; } .row.yellow .sub { color: #D9C9A8; }
+.row.green { background: var(--good-bg); border-color: var(--good-line); } .row.green .sub { color: #B9DCC5; }
+.row.blue { background: var(--info-bg); border-color: var(--info-line); } .row.blue .sub { color: #BCD5F2; }
+.row.badge-row.yellow { background: #1A170F; border-color: #5E4B1E; }
+.row.red .more { border-color: #8C3631; } .row.yellow .more { border-color: #8A6A22; }
+.row.green .more { border-color: var(--good-line); } .row.blue .more { border-color: var(--info-line); }
+
+.tag.red { color: #FFFFFF; background: #C2453E; }
+.tag.yellow { color: var(--ground); background: var(--fair); }
+.tag.green { color: var(--ground); background: var(--good); }
+.tag.blue { color: var(--ground); background: var(--info); }
+.tag.outline.red { color: var(--bad-label); background: #2A1010; border-color: #C2453E; }
+.tag.outline.yellow { color: var(--fair-label); background: #2A2010; border-color: #8A6A22; }
+.tag.outline.green { color: var(--good-label); background: #0B1A12; border-color: var(--good-line); }
+.tag.outline.blue { color: var(--info-label); background: #0B1625; border-color: var(--info-line); }
+
+/* -- ended in the last 24 hours */
+.ended-row {
+  display: flex; justify-content: space-between; gap: 16px; padding: 8px 14px; border-radius: 8px;
+  font-size: 19px; color: #A9B4C0; background: #0D131A;
+}
+.ended-row span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ended-row span:last-child { flex-shrink: 0; }
+
+/* -- Details: over the page, the full NWS text and its buttons */
+.al-details {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(3, 5, 8, 0.78);
+}
+.al-panel {
+  width: 1040px; max-height: 620px; display: flex; flex-direction: column; gap: 12px; padding: 22px 26px;
+  background: var(--panel); border: 2px solid var(--panel-line); border-radius: 12px;
+}
+.al-panel.red { border-color: #C2453E; } .al-panel.yellow { border-color: #8A6A22; }
+.al-panel.green { border-color: var(--good-line); } .al-panel.blue { border-color: var(--info-line); }
+.d-top { display: flex; align-items: center; gap: 14px; }
+.d-source { font-size: 18px; color: var(--muted); }
+.al-panel h2 { margin: 0; font-size: 30px; font-weight: 700; line-height: 1.15; }
+.d-text {
+  margin: 0; font-size: 21px; line-height: 1.35; color: var(--ink-2); overflow-y: auto;
+  touch-action: pan-y; user-select: text; -webkit-user-select: text;
+}
+.d-instruction { padding-top: 10px; border-top: 1px solid var(--panel-line); }
+.d-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-shrink: 0; }
+.d-close {
+  min-width: 170px; height: 60px; font-size: 21px; font-weight: 600; color: var(--ink);
+  background: var(--ground); border: 1px solid #3A4756; border-radius: 10px;
+}

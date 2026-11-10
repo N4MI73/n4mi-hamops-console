@@ -3,7 +3,8 @@
 Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather, /api/alerts,
 /api/system, POST /api/alerts/ack and /api/alerts/clear-hold, and
 GET/PUT /api/settings with POST /api/settings/test. 2026-11-07: POST
-/api/weather-radio/refresh.
+/api/weather-radio/refresh. 2026-11-10: the Alerts page (/alerts), and
+/api/alerts also lists NWS alerts ended in the last 24 hours.
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -22,13 +23,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_DIR = REPO_ROOT / "dashboard"
 
 
-def create_app(settings=None, propagation=None, weather=None, acks=None, dashboard_dir=DASHBOARD_DIR,
+def create_app(settings=None, propagation=None, weather=None, acks=None, ended=None, dashboard_dir=DASHBOARD_DIR,
                settings_file=None, test_connections=settings_api.test_connections):
     settings = settings or settings_mod.load()
     store = settings_api.SettingsStore(settings, settings_file)
     propagation = propagation or PropagationSource(settings)
     weather = weather or WeatherSource(settings)
     acks = acks or alerts_mod.AckStore()
+    ended = ended or alerts_mod.EndedStore()
     started_at = freshness.utcnow()
     app = Flask(__name__, static_folder=None)
 
@@ -53,6 +55,11 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, dashboa
         """The Propagation detail page (approved mockup "Propagation page")."""
         return send_from_directory(dashboard_dir, "propagation.html")
 
+    @app.get("/alerts")
+    def alerts_page():
+        """The Alerts detail page (approved mockup "Alerts page")."""
+        return send_from_directory(dashboard_dir, "alerts.html")
+
     @app.get("/check")
     def check_page():
         """The plain service check page (diagnostics), kept beside the dashboard."""
@@ -70,13 +77,16 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, dashboa
     def api_weather():
         return envelope(**weather.blocks())
 
-    def ranked():
-        return alerts_mod.build(propagation.block(), weather.blocks(), settings,
+    def ranked(blocks=None):
+        return alerts_mod.build(propagation.block(), blocks or weather.blocks(), settings,
                                 freshness.utcnow(), acks.current())
 
     @app.get("/api/alerts")
     def api_alerts():
-        return envelope(items=ranked())
+        blocks = weather.blocks()
+        items = ranked(blocks)
+        status = (blocks.get("alerts") or {}).get("status")
+        return envelope(items=items, ended=ended.observe(items, status), nws_alerts_status=status)
 
     @app.post("/api/alerts/ack")
     def api_alerts_ack():

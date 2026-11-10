@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>Ham Ops Console · Alerts</title>
+<link rel="stylesheet" href="/static/home.css">
+<link rel="stylesheet" href="/static/alerts.css">
+</head>
+<body data-page="alerts">
+<!-- Ham Ops Console -- Alerts page, built from the approved mockup "Alerts page"
+     (2026-10-12, updated 2026-11-01): what is on the Priority Card (worst first),
+     the less urgent notifications counted on the Alerts badge, and NWS alerts that
+     ended in the last 24 hours. The ranking is the console service's (alerts.py);
+     this page only draws it. See common.js and alerts.js. -->
+<div class="screen">
+
+  <header class="status-bar">
+    <div class="clock"><span class="utc num" id="utc">--:--Z</span><span class="local" id="local">--</span></div>
+    <span class="mode-tag" id="mode">--</span>
+    <span class="station" id="station">--</span>
+    <div class="spacer"></div>
+    <div class="pills">
+      <span class="pill" id="pill-internet"><span class="dot"></span>Internet</span>
+      <span class="pill" id="pill-nas"><span class="dot"></span>NAS</span>
+      <span class="pill" id="pill-gps"><span class="dot"></span><span class="label">GPS</span></span>
+    </div>
+  </header>
+
+  <nav class="modules" aria-label="Modules">
+    <button data-href="/">Home</button>
+    <button data-href="/propagation">Propagation</button>
+    <button data-href="/weather">Weather</button>
+    <button class="current" aria-current="page" id="alerts-button">Alerts<span class="badge" id="badge" hidden></span></button>
+    <button disabled>System<span class="soon">Coming</span></button>
+  </nav>
+
+  <section class="al-body" id="al-body" aria-label="Alerts">
+    <span class="al-head">ON THE PRIORITY CARD · WORST FIRST</span>
+    <div class="al-list" id="card-list"></div>
+    <span class="al-head">NOTIFICATIONS · LESS URGENT (THE BADGE ON THE ALERTS BUTTON)</span>
+    <div class="al-list" id="badge-list"></div>
+    <span class="al-head">ENDED · LAST 24 HOURS</span>
+    <div class="al-ended" id="ended-list"></div>
+  </section>
+
+  <footer class="toolbar">
+    <button id="refresh">Refresh</button>
+    <button disabled>Settings<span class="soon">Coming</span></button>
+    <button disabled>Sleep<span class="soon">Coming</span></button>
+    <button disabled>Help<span class="soon">Coming</span></button>
+    <div class="spacer"></div>
+    <button class="shutdown" disabled>Shut down…<span class="soon">Coming</span></button>
+  </footer>
+
+</div>
+
+<div class="al-details" id="details" hidden role="dialog" aria-modal="true" aria-labelledby="d-title">
+  <div class="al-panel" id="d-panel">
+    <div class="d-top"><span class="tag" id="d-tag">--</span><span class="d-source" id="d-source">--</span></div>
+    <h2 id="d-title">--</h2>
+    <p class="d-text" id="d-detail"></p>
+    <p class="d-text d-instruction" id="d-instruction" hidden></p>
+    <div class="d-actions">
+      <button class="act" id="d-ack" hidden>Acknowledge</button>
+      <button class="act quiet" id="d-clear" hidden>Clear hold</button>
+      <div class="spacer"></div>
+      <button class="d-close" id="d-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
+<script src="/static/common.js"></script>
+<script src="/static/alerts.js"></script>
+</body>
+</html>

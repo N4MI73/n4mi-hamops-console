@@ -29,6 +29,12 @@ category the newest comes first. The list is never empty.
 
 Acknowledge is the console's own, stored on the Pi by AckStore, keyed by
 `ref.id`, and never sent to Weather Sentinel.
+
+The Alerts page also lists NWS alerts that ended in the last 24 hours
+(approved mockup "Alerts page"). EndedStore remembers which NWS alerts were
+in the list and notes when one leaves it -- but only while the NWS alerts
+block is current, because an alert missing from an out-of-date list hasn't
+necessarily ended.
 """
 
 import json
@@ -45,6 +51,7 @@ log = logging.getLogger(__name__)
 
 LIKELY_SOON_HOURS = 2
 ACK_KEEP_HOURS = 48
+ENDED_KEEP_HOURS = 24
 
 ORDER = ["hazard_warning", "lightning_5mi", "alerts_unavailable_storms", "hazard_alert",
          "lightning_likely_soon", "lightning_frequent", "lightning_10mi", "lightning_outlook",
@@ -100,6 +107,8 @@ def _nws_items(alerts):
         item = _item(category, a.get("event"), detail, a.get("onset"), "weather.alerts",
                      a.get("id") or f"nws-{a.get('event')}-{a.get('expires')}", color)
         item["until"] = a.get("expires")    # for the Weather page's short line (2026-11-07)
+        item["kind"] = kind                  # warning / watch / advisory / statement (Alerts page label)
+        item["instruction"] = a.get("instruction")   # NWS's advice, for the Alerts page's Details
         out.append(item)
     return out
 
@@ -293,3 +302,80 @@ class AckStore:
                 os.replace(tmp, self.path)
             except OSError as e:
                 log.error("could not save acknowledgement to %s (%s); kept in memory", self.path, e)
+
+
+class EndedStore:
+    """NWS alerts that ended in the last ENDED_KEEP_HOURS hours, for the Alerts
+    page's "Ended" list. Kept in a small JSON file on the Pi next to the
+    acknowledgements, so a restart doesn't forget them. A missing or broken
+    file is treated as empty and never stops the service.
+
+    An alert counts as ended when it leaves the NWS list while that list is
+    current (status ok). While it is stale, unavailable or in test mode nothing
+    is concluded: a missing alert there may simply not have been fetched. The
+    end time is the alert's own expiry if that has passed, otherwise the time
+    it was seen gone (NWS ended it early). An alert that comes back (extended)
+    leaves the ended list."""
+
+    def __init__(self, path=None, clock=freshness.utcnow):
+        default = Path.home() / ".local" / "state" / "hamops-console" / "ended.json"
+        self.path = Path(path or os.environ.get("HAMOPS_STATE_ENDED") or default)
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._active, self._ended = self._load()
+
+    def _load(self):
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                data = json.load(f)
+            active = {k: v for k, v in (data.get("active") or {}).items() if isinstance(v, dict)}
+            ended = [e for e in data.get("ended") or [] if isinstance(e, dict) and e.get("id")]
+            return active, ended
+        except FileNotFoundError:
+            return {}, []
+        except (OSError, ValueError, AttributeError) as e:
+            log.error("could not read %s (%s); starting with no ended alerts", self.path, e)
+            return {}, []
+
+    def _save(self):
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"active": self._active, "ended": self._ended}, f, indent=1)
+            os.replace(tmp, self.path)
+        except OSError as e:
+            log.error("could not save ended alerts to %s (%s); kept in memory", self.path, e)
+
+    def observe(self, items, alerts_status):
+        """Note the NWS items now in the ranked list; return the ended list,
+        newest first. Call with every freshly built list."""
+        with self._lock:
+            now = self._clock()
+            changed = False
+            if alerts_status == freshness.OK:
+                current = {i["ref"]["id"]: i for i in items if i["ref"]["block"] == "weather.alerts"}
+                for id_, seen in list(self._active.items()):
+                    if id_ in current:
+                        continue
+                    until = freshness.parse_time(seen.get("until"))
+                    ended_at = until if until is not None and until <= now else now
+                    self._ended.append(dict(seen, id=id_, ended_at=freshness.iso(ended_at)))
+                    del self._active[id_]
+                    changed = True
+                for id_, item in current.items():
+                    record = {"title": item["title"], "category": item["category"], "kind": item.get("kind"),
+                              "color": item["color"], "until": item.get("until")}
+                    if self._active.get(id_) != record:
+                        self._active[id_] = record
+                        changed = True
+                before = len(self._ended)
+                self._ended = [e for e in self._ended if e["id"] not in current]
+                changed = changed or len(self._ended) != before
+            cutoff = now - timedelta(hours=ENDED_KEEP_HOURS)
+            kept = [e for e in self._ended if (freshness.parse_time(e.get("ended_at")) or now) >= cutoff]
+            if len(kept) != len(self._ended):
+                self._ended, changed = kept, True
+            if changed:
+                self._save()
+            return sorted((dict(e) for e in self._ended), key=lambda e: e.get("ended_at") or "", reverse=True)
