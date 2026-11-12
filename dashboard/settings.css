@@ -105,3 +105,7 @@
   min-width: 220px; height: 60px; font-size: 21px; font-weight: 600; color: var(--ink-2);
   background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
 }
+
+/* -- Field Day times: label, date, time (approved board "Settings · Station & profile") */
+.fd-times { display: grid; grid-template-columns: 84px minmax(0, 1fr) 88px; gap: 8px; align-items: center; }
+.fd-times .field { font-size: 19px; padding: 0 10px; }

@@ -220,3 +220,21 @@ html.night-red .cell.fair { border-color: #707070; }
 html.night-red .cell:not(.good):not(.fair) b, html.night-red .band:not(:has(span.good)):not(:has(span.fair)) b { color: #6A6A6A; }
 html.night-red .band span { font-size: 18px; font-weight: 800; }
 html.night-red .cell span { font-size: 22px; font-weight: 800; }
+
+/* -- Field Day timer pill (approved 2026-11-05): info blue; the reminder quieter; complete grey */
+.fd-pill {
+  display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 6px; box-sizing: border-box;
+  background: #0E1B2B; border: 1px solid #2F6FB3; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+}
+.fd-pill[hidden] { display: none; }
+.fd-pill.quiet { background: var(--ground); }
+.fd-pill.done { background: var(--ground); border-color: #3A4756; }
+.fd-tag { font-size: 14px; font-weight: 700; letter-spacing: 0.08em; padding: 4px 8px; border-radius: 999px; color: #0A0E13; background: #9CC8FF; }
+.fd-pill.done .fd-tag { background: #A3B0BE; }
+.fd-word { font-size: 18px; font-weight: 600; color: #9CC8FF; }
+.fd-num { font-family: "Barlow Condensed", sans-serif; font-size: 26px; font-weight: 600; color: #FFFFFF; }
+.fd-day { font-size: 18px; font-weight: 600; color: #C9D3DD; }
+.fd-pill.done .fd-day { color: var(--ink); }
+.fd-dim { font-size: 18px; color: var(--muted); }
+.fd-pill svg { width: 20px; height: 20px; color: #C9D3DD; flex-shrink: 0; }
+.status-bar .local, .status-bar .mode-tag, .status-bar .station, .status-bar .pill { white-space: nowrap; }

@@ -28,11 +28,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import forecast, grid as grid_mod, settings as settings_mod
+from . import field_day, forecast, grid as grid_mod, settings as settings_mod
 
 log = logging.getLogger(__name__)
 
-EDITABLE = ("mode", "station", "display", "sources", "thresholds", "nws_user_agent_contact")
+EDITABLE = ("mode", "station", "display", "profile", "field_day", "sources", "thresholds",
+            "nws_user_agent_contact")
 
 # (low, high) for each numeric threshold; whole numbers unless listed in FLOATS.
 THRESHOLD_RANGES = {
@@ -139,6 +140,28 @@ def check(changes, current):
                         errors.append(f"{where}: a 24-hour time such as 22:00")
                 else:
                     errors.append(f"{where} isn't a display setting")
+
+    if "profile" in changes and changes["profile"] not in field_day.PROFILES:
+        errors.append("profile must be 'general_hf' or 'field_day'")
+
+    fd = changes.get("field_day")
+    if fd is not None:
+        if not isinstance(fd, dict):
+            errors.append("field_day must be an object")
+        else:
+            for field, value in fd.items():
+                where = f"field_day.{field}"
+                if field not in ("ops_start", "ops_end"):
+                    errors.append(f"{where} isn't a Field Day setting")
+                elif value is not None and field_day.parse(value) is None:
+                    errors.append(f"{where}: a UTC date and time such as 2027-01-30T19:00Z")
+            merged = dict(current.get("field_day") or {}, **fd)
+            start, end = field_day.parse(merged.get("ops_start")), field_day.parse(merged.get("ops_end"))
+            if start and end:
+                if end <= start:
+                    errors.append("field_day: operations must end after they start")
+                elif (end - start).total_seconds() > 72 * 3600:
+                    warnings.append("field_day: operations are set to last more than 72 hours")
 
     sources = changes.get("sources")
     if sources is not None:

@@ -7,7 +7,8 @@ GET/PUT /api/settings with POST /api/settings/test. 2026-11-07: POST
 /api/alerts also lists NWS alerts ended in the last 24 hours. The System page
 (/system). 2026-11-11: the Settings screen (/settings); later the same day
 POST /api/display (Sleep and wake) and POST /api/power (Shut down, Restart),
-the `display` block in /api/system, and pages and their files sent with
+the `display` block in /api/system (2026-11-12: also the `field_day` block, for the
+Field Day timer pill), and pages and their files sent with
 "Cache-Control: no-cache" so a `git pull` shows on the screen without a reboot.
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
@@ -19,7 +20,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from . import __version__, alerts as alerts_mod, freshness, power, settings as settings_mod, settings_api, system_info
+from . import __version__, alerts as alerts_mod, field_day, freshness, power, settings as settings_mod, settings_api, system_info
 from .display import Display
 from .propagation import PropagationSource
 from .weather import WeatherSource
@@ -172,7 +173,8 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
 
     @app.get("/api/system")
     def api_system():
-        return envelope(system=system_info.block(__version__, started_at), display=display.block())
+        return envelope(system=system_info.block(__version__, started_at), display=display.block(),
+                        field_day=field_day.block(settings))
 
     @app.post("/api/display")
     def api_display():

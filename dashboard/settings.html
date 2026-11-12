@@ -12,8 +12,8 @@
      Display, Data sources, Wi-Fi). Every change is saved on the Pi at once through
      PUT /api/settings, which checks it first; nothing is saved if the service refuses it.
      Text is typed on the on-screen keyboard (the kiosk has none of its own). Parts that
-     belong to later builds (Field Mode, the Field Day timer, economy mode, Wi-Fi, screen
-     brightness) are shown and marked. See common.js and settings.js. -->
+     belong to later builds (Field Mode, economy mode, Wi-Fi) are shown and marked. The Field
+     Day profile and its operations times work since 2026-11-12. See common.js and settings.js. -->
 <div class="screen">
 
   <header class="status-bar">
@@ -57,12 +57,16 @@
     <section class="tile" aria-label="Operating profile">
       <span class="st-head">OPERATING PROFILE</span>
       <div class="seg">
-        <button aria-pressed="true">General HF</button>
-        <button disabled>Field Day<span class="soon">Coming</span></button>
+        <button id="op-gen" aria-pressed="false">General HF</button>
+        <button id="op-fd" aria-pressed="false">Field Day</button>
       </div>
       <span class="st-note">Field Day adds the Field Day timer to the status bar. Alerts and data are the same in both.</span>
       <span class="st-head">FIELD DAY OPERATIONS · UTC</span>
-      <span class="st-note">Ops start and end are set here when the Field Day timer is built.</span>
+      <div class="fd-times">
+        <span class="st-label">Ops start</span><button class="field" id="f-fd_start_date">--</button><button class="field" id="f-fd_start_time">--</button>
+        <span class="st-label">Ops end</span><button class="field" id="f-fd_end_date">--</button><button class="field" id="f-fd_end_time">--</button>
+      </div>
+      <span class="st-note" id="fd-local">Setup counts down to the start of operations.</span>
     </section>
 
     <section class="tile" aria-label="Economy mode">

@@ -13,6 +13,8 @@
     "night_start": "22:00",
     "night_end": "07:00"
   },
+  "profile": "general_hf",
+  "field_day": {"ops_start": null, "ops_end": null},
   "sources": {
     "propmon_url": "http://<propmon-host>:8076",
     "sentinel_url": "http://<sentinel-host>:8085"

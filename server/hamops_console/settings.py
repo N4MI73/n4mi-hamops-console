@@ -33,6 +33,11 @@ DEFAULTS = {
         "night_start": "22:00",
         "night_end": "07:00",
     },
+    "profile": "general_hf",          # "general_hf" or "field_day" (2026-11-12)
+    "field_day": {                    # operations start and end, UTC, e.g. "2027-01-30T19:00Z"
+        "ops_start": None,
+        "ops_end": None,
+    },
     "sources": {
         "propmon_url": "",
         "sentinel_url": "",

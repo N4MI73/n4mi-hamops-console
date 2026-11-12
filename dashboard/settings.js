@@ -29,6 +29,7 @@ const mode = () => (settings().mode === "field" ? "field" : "home");
 const station = () => ((settings().station || {})[mode()]) || {};
 const display = () => settings().display || {};
 const sources = () => settings().sources || {};
+const fieldDay = () => settings().field_day || {};
 
 // ----------------------------------------------------------------- saving
 
@@ -91,7 +92,33 @@ for (const b of document.querySelectorAll(".st-tabs button")) b.addEventListener
 
 function press(id, on) { $(id).setAttribute("aria-pressed", on ? "true" : "false"); }
 
+function renderFieldDay() {
+  const fdOn = settings().profile === "field_day";
+  press("op-gen", !fdOn);
+  press("op-fd", fdOn);
+  const fd = fieldDay();
+  const dateText = v => {
+    if (!v) return "Set date";
+    const d = new Date(v.replace("Z", ":00Z"));
+    const part = o => d.toLocaleDateString("en-GB", Object.assign({timeZone: "UTC"}, o));
+    return `${part({weekday: "short"})} ${part({day: "numeric"})} ${part({month: "short"})} ${d.getUTCFullYear()}`;
+  };
+  const timeText = v => v ? `${v.slice(11, 16)}Z` : "--";
+  $("f-fd_start_date").textContent = dateText(fd.ops_start);
+  $("f-fd_start_time").textContent = timeText(fd.ops_start);
+  $("f-fd_end_date").textContent = dateText(fd.ops_end);
+  $("f-fd_end_time").textContent = timeText(fd.ops_end);
+  let note = "Setup counts down to the start of operations.";
+  if (fd.ops_start && fd.ops_end) {
+    const loc = v => new Date(v.replace("Z", ":00Z")).toLocaleString("en-US",
+      {weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short"});
+    note += ` Local: ${loc(fd.ops_start)} to ${loc(fd.ops_end)}.`;
+  }
+  $("fd-local").textContent = note;
+}
+
 function renderProfile() {
+  renderFieldDay();
   press("src-home", mode() === "home");
   $("src-note").textContent = mode() === "home"
     ? "Where the data comes from. Home: PropMon and Weather Sentinel on the home network. Field (the internet, through this Pi) comes with Phase 3."
@@ -182,6 +209,8 @@ function render() {
 // ----------------------------------------------------------------- choices
 
 $("src-home").addEventListener("click", () => { if (mode() !== "home") saveOrSay({mode: "home"}); });
+$("op-gen").addEventListener("click", () => { if (settings().profile === "field_day") saveOrSay({profile: "general_hf"}); });
+$("op-fd").addEventListener("click", () => { if (settings().profile !== "field_day") saveOrSay({profile: "field_day"}); });
 $("mc-utc").addEventListener("click", () => { if (mainClock() !== "utc") saveOrSay({display: {main_clock: "utc"}}); });
 $("mc-local").addEventListener("click", () => { if (mainClock() !== "local") saveOrSay({display: {main_clock: "local"}}); });
 $("ns-dim").addEventListener("click", () => saveOrSay({display: {night_style: "dim"}}));
@@ -247,7 +276,33 @@ const FIELDS = {
                 get: () => display().night_start, change: v => ({display: {night_start: v}})},
   night_end: {title: "Night ends", hint: "24-hour local time, e.g. 07:00",
               get: () => display().night_end, change: v => ({display: {night_end: v}})},
+  fd_start_date: fdField("ops_start", "date", "Operations start date (UTC)"),
+  fd_start_time: fdField("ops_start", "time", "Operations start time (UTC)"),
+  fd_end_date: fdField("ops_end", "date", "Operations end date (UTC)"),
+  fd_end_time: fdField("ops_end", "time", "Operations end time (UTC)"),
 };
+
+/* Field Day times are stored as "2027-01-30T19:00Z" and typed as a date and a time.
+   (A touch date picker can replace the keyboard later.) A date with no time yet gets
+   00:00Z; a time needs its date first. */
+function fdField(key, part, title) {
+  const isDate = part === "date";
+  return {
+    title, hint: isDate ? "Year-month-day, e.g. 2027-01-30" : "24-hour UTC, e.g. 19:00",
+    get: () => { const v = fieldDay()[key]; return v ? (isDate ? v.slice(0, 10) : v.slice(11, 16)) : ""; },
+    change: v => {
+      const cur = fieldDay()[key];
+      if (v === "") return {field_day: {[key]: null}};
+      if (isDate) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return {error: "Type the date as year-month-day, e.g. 2027-01-30."};
+        return {field_day: {[key]: `${v}T${cur ? cur.slice(11, 16) : "00:00"}Z`}};
+      }
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return {error: "Type the time as hours:minutes, e.g. 19:00."};
+      if (!cur) return {error: "Set the date first."};
+      return {field_day: {[key]: `${cur.slice(0, 10)}T${v}Z`}};
+    },
+  };
+}
 
 /* Layout from the approved board; ":" and "/" are on the main layer because addresses
    and times need them. */
@@ -331,7 +386,9 @@ async function saveKeyboard() {
   if (!f) return;
   $("kb-save").disabled = true;
   $("kb-error").textContent = "";
-  const res = await save(f.change(page.text.trim()));
+  const change = f.change(page.text.trim());
+  if (change.error) { $("kb-save").disabled = false; $("kb-error").textContent = change.error; return; }
+  const res = await save(change);
   $("kb-save").disabled = false;
   if (res.ok) closeKeyboard();
   else $("kb-error").textContent = res.errors.map(plain).join(" ");

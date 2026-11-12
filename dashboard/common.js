@@ -79,11 +79,12 @@ function tickClock() {
   // The ids stay "utc" (large) and "local" (small); what they hold follows the main clock.
   if (mainClock() === "local") {
     $("utc").textContent = localClock(now);
-    $("local").textContent = [tz, utcClock(now), day].filter(Boolean).join(" · ");
+    $("local").textContent = [tz, utcClock(now), fdShowing() ? "" : day].filter(Boolean).join(" · ");
   } else {
     $("utc").textContent = utcClock(now);
-    $("local").textContent = `${localClock(now)}${tz ? " " + tz : ""} · ${day}`;
+    $("local").textContent = `${localClock(now)}${tz ? " " + tz : ""}` + (fdShowing() ? "" : ` · ${day}`);
   }
+  if (state.receivedAt) renderFieldDayPill();   // the countdown moves each minute
 }
 
 /* Tap the big time to swap UTC and local. Saved on the Pi (PUT /api/settings), so the
@@ -145,6 +146,80 @@ function setDot(el, cls) { el.className = "dot " + (cls || ""); }
 
 // ----------------------------------------------------------------- status bar
 
+// ----------------------------------------------------------------- Field Day timer (2026-11-12)
+
+/* The Field Day profile's pill in the status bar (approved 2026-11-05): a reminder before
+   the day, then Setup counting down to the start of operations (from local midnight on
+   the day -- the service works that out), then Operations counting down to the end, then
+   "Operations complete" until the profile is switched off. Hours:minutes, rounded up so
+   it never reads 0:00 while time is left. Times in the pill are UTC, as entered. */
+/* While the pill shows, the status bar drops the date beside the clock to make room. */
+function fdShowing() {
+  const p = document.getElementById("fd-pill");
+  return !!(p && !p.hidden);
+}
+
+function fdHM(ms) {
+  const m = Math.max(0, Math.ceil(ms / 60000));
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+}
+
+function fdUtcHM(d) {
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}Z`;
+}
+
+function renderFieldDayPill() {
+  let p = $("fd-pill");
+  if (!p) {
+    const station = $("station");
+    if (!station) return;
+    p = document.createElement("span");
+    p.id = "fd-pill";
+    p.className = "fd-pill";
+    p.hidden = true;
+    station.after(p);
+  }
+  const fd = state.data.system && state.data.system.field_day;
+  if (!fd || !fd.enabled) { p.hidden = true; return; }
+  const span = (cls, text) => { const e = document.createElement("span"); e.className = cls; e.textContent = text; return e; };
+  const tag = span("fd-tag", "FIELD DAY");
+  const now = Date.now();
+  const start = fd.ops_start ? new Date(fd.ops_start) : null;
+  const end = fd.ops_end ? new Date(fd.ops_end) : null;
+  const setup = fd.setup_start ? new Date(fd.setup_start) : null;
+  let cls = "fd-pill", parts, label;
+  if (!start || !end || !setup) {
+    cls += " quiet";
+    parts = [span("fd-dim", "Set ops times in Settings")];
+    label = "Field Day: operations times not set";
+  } else if (now < setup) {
+    cls += " quiet";
+    const day = start.toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short", timeZone: "UTC"});
+    parts = [span("fd-day", day), span("fd-dim", `ops ${fdUtcHM(start)}`)];
+    label = `Field Day ${day}, operations start ${fdUtcHM(start)}`;
+  } else if (now < start) {
+    const left = fdHM(start - now);
+    parts = [span("fd-word", "Setup"), span("fd-num num", left), span("fd-dim", "until operations")];
+    label = `Field Day setup, ${left} until operations`;
+  } else if (now < end) {
+    const left = fdHM(end - now);
+    parts = [span("fd-word", "Operations"), span("fd-num num", left), span("fd-dim", "left")];
+    label = `Field Day operations, ${left} left`;
+  } else {
+    cls += " done";
+    const tick = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    tick.setAttribute("viewBox", "0 0 20 20");
+    tick.setAttribute("aria-hidden", "true");
+    tick.innerHTML = '<path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+    parts = [tick, span("fd-day", "Operations complete"), span("fd-dim", fdUtcHM(end))];
+    label = `Field Day operations complete, ended ${fdUtcHM(end)}`;
+  }
+  p.className = cls;
+  p.setAttribute("aria-label", label);
+  p.replaceChildren(tag, ...parts);
+  p.hidden = false;
+}
+
 function renderStatusBar() {
   const {settings, weather, propagation, system} = state.data;
   const mode = (weather && weather.mode) || (settings && settings.mode) || "home";
@@ -169,6 +244,7 @@ function renderStatusBar() {
   const present = gps && gps.present;
   gpsPill.querySelector(".label").textContent = present ? (gps.fix ? `GPS ${gps.fix.toUpperCase()}` : "GPS") : "GPS off";
   pill("pill-gps", present ? (gps.fix ? "good" : "fair") : "off", present);
+  renderFieldDayPill();
 }
 function pill(id, dot, on) {
   const el = $(id);
