@@ -1,0 +1,107 @@
+/* Ham Ops Console -- Settings (tabs approved 2026-11-05). Uses home.css for the shared parts
+   (fonts, colours, status bar, tiles, toolbar). Touch targets are 52-64 px tall; text 16 px
+   or larger. */
+
+.st-title { font-size: 24px; font-weight: 600; }
+.st-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.st-body { flex-grow: 1; min-height: 0; display: grid; gap: 10px; }
+.st-body[hidden] { display: none; }
+.st-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.st-two { grid-template-columns: 1.3fr 1fr; }
+.st-body .tile { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; min-height: 0; }
+
+.st-head { font-size: 16px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); }
+.st-head:not(:first-child) { margin-top: 4px; }
+.st-note { font-size: 17px; line-height: 1.3; color: var(--muted); }
+.st-note.big { font-size: 19px; color: var(--ink); }
+.st-note.warn { color: var(--fair-label); }
+.st-foot { margin-top: auto; }
+.st-label { font-size: 18px; color: var(--muted); }
+.st-value { font-size: 21px; font-weight: 600; }
+.st-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); column-gap: 10px; align-items: center; }
+
+/* -- two-way choices (pressed = chosen) */
+.seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.seg button {
+  height: 60px; font-size: 22px; font-weight: 600; color: var(--ink-2); line-height: 1.1;
+  background: var(--ground); border: 1px solid #2E3B49; border-radius: 10px;
+}
+.seg.small button { height: 52px; font-size: 19px; }
+.seg button[aria-pressed="true"] { font-weight: 700; color: #FFFFFF; background: #17212C; border: 2px solid var(--info); }
+.seg button:disabled { color: var(--dim); border-color: var(--panel-line); }
+.seg button.red-btn { color: #F08A84; background: #1A0B0A; border-color: #5A2A28; }
+.seg button.red-btn[aria-pressed="true"] { color: #FFFFFF; background: #3A1513; border: 2px solid #E0605A; }
+
+/* -- a value that opens the on-screen keyboard when touched */
+.field {
+  width: 100%; min-width: 0; height: 52px; padding: 0 12px; text-align: left; font-size: 22px; font-weight: 600;
+  letter-spacing: 0.03em; color: var(--ink); background: var(--ground); border: 1px solid #2E3B49; border-radius: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.field.wide { font-size: 20px; letter-spacing: 0; }
+.field:active { border-color: var(--info); }
+
+.st-action {
+  height: 56px; padding: 0 20px; font-size: 20px; font-weight: 600; color: var(--ink);
+  background: #17212C; border: 1px solid var(--info); border-radius: 10px; flex-shrink: 0;
+}
+.st-action:disabled { color: var(--dim); border-color: var(--panel-line); }
+
+/* -- Display tab */
+.st-slider-label { display: flex; justify-content: space-between; font-size: 19px; }
+.st-slider-label span:last-child { color: var(--muted); }
+.st-slider { width: 100%; height: 44px; margin: 0; accent-color: var(--info); }
+.preview { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--ground); border-radius: 8px; font-size: 17px; color: var(--ink-2); }
+.pv-clock { display: flex; align-items: baseline; gap: 10px; }
+.pv-big { font-family: "Barlow Condensed", sans-serif; font-size: 30px; font-weight: 600; color: var(--ink); }
+.pv-small { color: var(--muted); }
+
+/* -- Data sources tab */
+.results { display: flex; flex-direction: column; gap: 8px; font-size: 19px; }
+.results .r { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.results .r .msg { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-radio { display: flex; align-items: center; gap: 14px; }
+.st-radio-text { flex-grow: 1; display: flex; flex-direction: column; gap: 2px; font-size: 20px; }
+.st-radio-text span { font-size: 17px; color: var(--muted); }
+
+/* -- footer */
+.st-done {
+  min-width: 220px; height: 60px; font-size: 21px; font-weight: 700; color: #FFFFFF;
+  background: #17212C; border: 2px solid var(--info); border-radius: 10px;
+}
+.st-msg { align-self: center; font-size: 19px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.st-msg.ok { color: var(--good); } .st-msg.warn { color: var(--fair-label); } .st-msg.bad { color: var(--bad-label); }
+
+/* -- on-screen keyboard: over the whole screen, as on the approved Wi-Fi join board */
+.kb {
+  position: fixed; inset: 0; box-sizing: border-box; padding: 16px 18px 12px; display: flex; flex-direction: column;
+  gap: 12px; background: var(--ground);
+}
+.kb[hidden] { display: none; }
+.kb-top { display: flex; align-items: baseline; gap: 16px; }
+.kb-title { font-size: 28px; font-weight: 700; }
+.kb-hint { font-size: 18px; color: var(--muted); }
+.kb-field {
+  height: 64px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; font-size: 28px;
+  font-weight: 600; letter-spacing: 0.04em; color: var(--ink); background: var(--panel); border: 2px solid var(--info);
+  border-radius: 8px; overflow: hidden; white-space: pre;
+}
+.kb-field .caret { width: 2px; height: 34px; margin-left: 2px; background: var(--info); animation: hocCaret 1s steps(1) infinite; }
+@keyframes hocCaret { 50% { opacity: 0; } }
+.kb-error { min-height: 24px; font-size: 19px; color: var(--bad-label); }
+.kb-keys { flex-grow: 1; display: flex; flex-direction: column; gap: 8px; }
+.kb-row { flex: 1 1 0; display: flex; gap: 8px; }
+.kb-row button {
+  flex: 1 1 0; min-width: 0; font-size: 26px; font-weight: 600; color: var(--ink);
+  background: #1A222C; border: 1px solid #2E3B49; border-radius: 8px;
+}
+.kb-row button.fn { font-size: 21px; color: var(--ink-2); background: var(--panel); }
+.kb-row button.fn.on { color: #FFFFFF; border: 2px solid var(--info); }
+.kb-row button:active { background: #24303D; }
+.kb-row .gap { flex: 0.5 1 0; visibility: hidden; }
+.kb-actions { height: 60px; flex-shrink: 0; display: flex; gap: 10px; }
+.kb-cancel {
+  min-width: 220px; height: 60px; font-size: 21px; font-weight: 600; color: var(--ink-2);
+  background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
+}

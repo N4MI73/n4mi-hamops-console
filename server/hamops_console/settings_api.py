@@ -187,8 +187,13 @@ def check(changes, current):
 
 
 def _url_ok(value):
+    """http(s)://host[:port][/path], no spaces, a real port number. Addresses are typed on
+    the touchscreen keyboard (2026-11-11), so a slip such as "8076http://..." is refused."""
+    if any(c.isspace() for c in value):
+        return False
     try:
         parts = urllib.parse.urlparse(value)
+        parts.port                      # raises ValueError for a port that isn't a number
     except ValueError:
         return False
     return parts.scheme in ("http", "https") and bool(parts.hostname) and not parts.query

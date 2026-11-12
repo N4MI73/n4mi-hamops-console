@@ -190,6 +190,7 @@ function alertItems() {
 function renderBadge() {
   const items = alertItems().filter(i => i.tier === "badge");
   const badge = $("badge");
+  if (!badge) return;                // the Settings screen has no module row
   badge.hidden = !items.length;
   badge.textContent = items.length;
   badge.setAttribute("aria-label", `${items.length} notification${items.length === 1 ? "" : "s"}`);

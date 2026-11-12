@@ -5,7 +5,7 @@ Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather, /api/alerts,
 GET/PUT /api/settings with POST /api/settings/test. 2026-11-07: POST
 /api/weather-radio/refresh. 2026-11-10: the Alerts page (/alerts), and
 /api/alerts also lists NWS alerts ended in the last 24 hours. The System page
-(/system).
+(/system). 2026-11-11: the Settings screen (/settings).
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -65,6 +65,11 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
     def system_page():
         """The System detail page (approved mockup "System page")."""
         return send_from_directory(dashboard_dir, "system.html")
+
+    @app.get("/settings")
+    def settings_page():
+        """The Settings screen in the approved tabs (2026-11-11)."""
+        return send_from_directory(dashboard_dir, "settings.html")
 
     @app.get("/check")
     def check_page():

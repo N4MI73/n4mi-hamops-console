@@ -71,6 +71,8 @@ class Check(unittest.TestCase):
             ({"display": {"day_brightness_pct": 120}}, "5 to 100"),
             ({"display": {"night_start": "25:00"}}, "24-hour"),
             ({"sources": {"propmon_url": "ftp://x"}}, "an address"),
+            ({"sources": {"propmon_url": "http://x:8076http://x:8076"}}, "an address"),
+            ({"sources": {"propmon_url": "http://x :8076"}}, "an address"),
             ({"sources": {"weird_url": "http://x"}}, "isn't a source"),
             ({"thresholds": {"propagation_stale_min": 2}}, "5 to 1440"),
             ({"thresholds": {"propagation_stale_min": 30.5}}, "whole number"),

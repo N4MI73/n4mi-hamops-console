@@ -522,6 +522,16 @@ Optional body `{"sources": {"propmon_url": "...", "sentinel_url": "..."}}` tests
 
 NWS is tested against a small JSON endpoint (its home page is HTML). `message` explains a failure: "address not set", "not answering (URLError)", "answered with an error (503)", "answered, but not with JSON".
 
+### The Settings screen (`/settings`, built 11 November 2026)
+
+The screen in the approved tabs uses only the three calls above plus `POST /api/weather-radio/refresh`. Every change is sent at once as its own `PUT`; there is no separate Save step. The service's reasons for refusing a change are shown where it was made (in the keyboard, or on the footer line), and nothing is saved.
+
+- **Station & profile:** callsign and grid for the current mode, typed on the on-screen keyboard. Data source Field is shown but disabled ("Phase 3"), GPS as the grid source "Phase 4", and the Field Day profile and economy mode "Coming"/"Phase 3". A 4-character grid shows the coarse-grid warning.
+- **Display:** the main clock (working), day and night brightness, night style and night times. Brightness and night style are saved now; the screen follows them once brightness control is built (with Sleep and Shut down).
+- **Data sources:** the PropMon and Weather Sentinel addresses, Test connections, and the weather radio list's age with Update now (202 starts it; 409 means one is already running).
+- **Wi-Fi:** shows the current network and signal; joining networks comes with Field Mode.
+- **Addresses** must be `http(s)://host[:port][/path]` with no spaces and a numeric port (tightened 11 November 2026, since addresses are now typed on the touchscreen).
+
 ---
 
 ## 9. Mode-by-mode source map

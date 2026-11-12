@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280, height=720">
+<title>Ham Ops Console · Settings</title>
+<link rel="stylesheet" href="/static/home.css">
+<link rel="stylesheet" href="/static/settings.css">
+</head>
+<body data-page="settings">
+<!-- Ham Ops Console -- Settings, in the tabs approved on 2026-11-05 (Station & profile,
+     Display, Data sources, Wi-Fi). Every change is saved on the Pi at once through
+     PUT /api/settings, which checks it first; nothing is saved if the service refuses it.
+     Text is typed on the on-screen keyboard (the kiosk has none of its own). Parts that
+     belong to later builds (Field Mode, the Field Day timer, economy mode, Wi-Fi, screen
+     brightness) are shown and marked. See common.js and settings.js. -->
+<div class="screen">
+
+  <header class="status-bar">
+    <div class="clock"><span class="utc num" id="utc">--:--Z</span><span class="local" id="local">--</span></div>
+    <span class="mode-tag" id="mode">--</span>
+    <span class="station" id="station">--</span>
+    <div class="spacer"></div>
+    <div class="pills" hidden>
+      <span class="pill" id="pill-internet"><span class="dot"></span>Internet</span>
+      <span class="pill" id="pill-nas"><span class="dot"></span>NAS</span>
+      <span class="pill" id="pill-gps"><span class="dot"></span><span class="label">GPS</span></span>
+    </div>
+    <span class="st-title">Settings</span>
+  </header>
+
+  <nav class="modules st-tabs" aria-label="Settings sections">
+    <button data-tab="profile">Station &amp; profile</button>
+    <button data-tab="display">Display</button>
+    <button data-tab="sources">Data sources</button>
+    <button data-tab="wifi">Wi-Fi</button>
+  </nav>
+
+  <!-- Station & profile -->
+  <div class="st-body st-three" id="tab-profile">
+    <section class="tile" aria-label="Data source and station">
+      <span class="st-head">DATA SOURCE</span>
+      <div class="seg">
+        <button id="src-home" aria-pressed="false">Home</button>
+        <button id="src-field" disabled>Field<span class="soon">Phase 3</span></button>
+      </div>
+      <span class="st-note" id="src-note">Where the data comes from.</span>
+      <span class="st-head" id="station-head">STATION</span>
+      <div class="st-row"><span class="st-label">Callsign</span><button class="field" id="f-callsign">--</button></div>
+      <div class="st-row"><span class="st-label">Grid from</span>
+        <div class="seg small"><button aria-pressed="true" id="gs-manual">Manual</button><button disabled>GPS<span class="soon">Phase 4</span></button></div>
+      </div>
+      <div class="st-row"><span class="st-label">Grid</span><button class="field" id="f-grid">--</button></div>
+      <span class="st-note warn" id="grid-warn" hidden></span>
+    </section>
+
+    <section class="tile" aria-label="Operating profile">
+      <span class="st-head">OPERATING PROFILE</span>
+      <div class="seg">
+        <button aria-pressed="true">General HF</button>
+        <button disabled>Field Day<span class="soon">Coming</span></button>
+      </div>
+      <span class="st-note">Field Day adds the Field Day timer to the status bar. Alerts and data are the same in both.</span>
+      <span class="st-head">FIELD DAY OPERATIONS · UTC</span>
+      <span class="st-note">Ops start and end are set here when the Field Day timer is built.</span>
+    </section>
+
+    <section class="tile" aria-label="Economy mode">
+      <span class="st-head">ECONOMY MODE</span>
+      <div class="seg">
+        <button aria-pressed="true">Off</button>
+        <button disabled>On<span class="soon">Phase 3</span></button>
+      </div>
+      <span class="st-note">Dims the screen and checks slow sources less often, to save battery and data. NWS alerts are never slowed.</span>
+    </section>
+  </div>
+
+  <!-- Display -->
+  <div class="st-body st-three" id="tab-display" hidden>
+    <section class="tile" aria-label="Main clock">
+      <span class="st-head">MAIN CLOCK</span>
+      <div class="seg">
+        <button id="mc-utc" aria-pressed="false">UTC</button>
+        <button id="mc-local" aria-pressed="false">Local</button>
+      </div>
+      <span class="st-note">The main clock is shown large and first everywhere; the other follows, smaller. Tapping the big time in the status bar swaps them too.</span>
+      <span class="st-head" id="mc-preview-head">PREVIEW</span>
+      <div class="preview">
+        <div class="pv-clock"><span class="pv-big num" id="pv-big">--</span><span class="pv-small" id="pv-small">--</span></div>
+        <span id="pv-card">--</span>
+      </div>
+    </section>
+
+    <section class="tile" aria-label="Brightness">
+      <span class="st-head">BRIGHTNESS</span>
+      <label class="st-slider-label" for="day-b"><span>Day brightness</span><span id="day-b-val">--</span></label>
+      <input class="st-slider" id="day-b" type="range" min="5" max="100" step="5">
+      <label class="st-slider-label" for="night-b"><span>Night brightness</span><span id="night-b-val">--</span></label>
+      <input class="st-slider" id="night-b" type="range" min="5" max="100" step="5">
+      <span class="st-note warn">Saved now; the screen follows these once brightness control is added (with Sleep and Shut down).</span>
+    </section>
+
+    <section class="tile" aria-label="Night">
+      <span class="st-head">NIGHT</span>
+      <span class="st-note big">Night style</span>
+      <div class="seg">
+        <button id="ns-dim" aria-pressed="false">Dim</button>
+        <button id="ns-red" class="red-btn" aria-pressed="false">Red</button>
+      </div>
+      <div class="st-row"><span class="st-label">Night from</span><button class="field" id="f-night_start">--</button></div>
+      <div class="st-row"><span class="st-label">to</span><button class="field" id="f-night_end">--</button></div>
+      <span class="st-note">Night times are local.</span>
+    </section>
+  </div>
+
+  <!-- Data sources -->
+  <div class="st-body st-two" id="tab-sources" hidden>
+    <section class="tile" aria-label="Home data sources">
+      <span class="st-head">DATA SOURCES · HOME MODE</span>
+      <span class="st-label">PropMon address</span>
+      <button class="field wide" id="f-propmon_url">--</button>
+      <span class="st-label">Weather Sentinel address</span>
+      <button class="field wide" id="f-sentinel_url">--</button>
+      <button class="st-action" id="test">Test connections</button>
+      <div class="results" id="results"></div>
+      <span class="st-note st-foot">Field Mode needs no addresses: it uses this Pi and the internet.</span>
+    </section>
+
+    <section class="tile" aria-label="Weather radio list">
+      <span class="st-head">NOAA WEATHER RADIO LIST</span>
+      <div class="st-radio">
+        <div class="st-radio-text"><b>Weather radio list</b><span id="radio-age">--</span></div>
+        <button class="st-action" id="radio-update">Update now</button>
+      </div>
+      <span class="st-note" id="radio-note">Stored on this Pi so the Weather Radio panel works with no internet. It updates itself weekly; update it before a field event.</span>
+    </section>
+  </div>
+
+  <!-- Wi-Fi -->
+  <div class="st-body st-two" id="tab-wifi" hidden>
+    <section class="tile" aria-label="Wi-Fi">
+      <span class="st-head">WI-FI</span>
+      <div class="st-row"><span class="st-label">Network</span><span class="st-value" id="wifi-now">--</span></div>
+      <span class="st-note big">Joining networks from the touchscreen comes with Field Mode (Phase 3).</span>
+      <span class="st-note">Until then, to use another phone's hotspot, set that hotspot's name and password to match the saved hotspot, or add the network at the Pi with a USB keyboard (nmtui).</span>
+    </section>
+  </div>
+
+  <footer class="toolbar">
+    <button class="st-done" id="done">Done</button>
+    <button disabled>Help<span class="soon">Coming</span></button>
+    <span class="st-msg" id="msg" role="status"></span>
+    <div class="spacer"></div>
+    <button class="shutdown" disabled>Shut down…<span class="soon">Coming</span></button>
+  </footer>
+
+</div>
+
+<!-- On-screen keyboard (approved 2026-11-05 with the Wi-Fi join screen) -->
+<div class="kb" id="kb" hidden role="dialog" aria-modal="true" aria-labelledby="kb-title">
+  <div class="kb-top"><span class="kb-title" id="kb-title">--</span><span class="kb-hint" id="kb-hint"></span></div>
+  <div class="kb-field" id="kb-field" aria-live="polite"><span id="kb-text"></span><span class="caret"></span></div>
+  <span class="kb-error" id="kb-error" role="alert"></span>
+  <div class="kb-keys" id="kb-keys" role="group" aria-label="On-screen keyboard"></div>
+  <div class="kb-actions">
+    <button class="kb-cancel" id="kb-cancel">Cancel</button>
+    <div class="spacer"></div>
+    <button class="st-done" id="kb-save">Save</button>
+  </div>
+</div>
+
+<div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
+<script src="/static/common.js"></script>
+<script src="/static/settings.js"></script>
+</body>
+</html>
