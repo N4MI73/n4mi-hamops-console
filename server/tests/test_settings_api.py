@@ -91,6 +91,8 @@ class Check(unittest.TestCase):
 
     def test_every_problem_reported(self):
         self.assertEqual(len(self.errors({"mode": "x", "display": {"night_style": "blue"}})), 2)
+        self.assertEqual(len(self.errors({"display": {"main_clock": "gmt"}})), 1)
+        self.assertEqual(self.errors({"display": {"main_clock": "local"}}), [])
 
 
 class Store(unittest.TestCase):

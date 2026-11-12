@@ -61,7 +61,7 @@ function sourceName(item) { return SOURCE_NAMES[item.ref && item.ref.block] || "
 function shortTime(iso) {
   const d = new Date(iso);
   const today = new Date().toDateString() === d.toDateString();
-  return (today ? "" : d.toLocaleDateString([], {weekday: "short"}) + " ") + localClock(d);
+  return (today ? "" : d.toLocaleDateString([], {weekday: "short"}) + " ") + mainTime(d);
 }
 
 function titleFor(item) {

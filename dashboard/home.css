@@ -45,6 +45,9 @@ button:disabled { cursor: default; }
   background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
 }
 .clock { display: flex; align-items: baseline; gap: 12px; }
+/* The big time swaps UTC and local when tapped: a little padding makes it an easy target. */
+.clock.tappable { padding: 6px 10px; margin: -6px -10px; border-radius: 8px; cursor: pointer; }
+.clock.tappable:active { background: var(--well); }
 .clock .utc { font-size: 34px; }
 .clock .local { font-size: 19px; color: var(--muted); }
 .mode-tag {

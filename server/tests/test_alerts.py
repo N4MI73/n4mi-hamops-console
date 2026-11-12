@@ -127,11 +127,11 @@ class Storm(unittest.TestCase):
         self.assertTrue(warning["critical"] and strike["critical"])
         self.assertFalse(any(i["critical"] for i in self.items[2:]))
         self.assertEqual(warning["color"], "red")
-        self.assertEqual(warning["detail"], "60 mph wind gusts and quarter size hail. Until 10:36 AM (15:36 UTC).")
+        self.assertEqual(warning["detail"], "60 mph wind gusts and quarter size hail. Until 15:36 UTC (10:36 AM).")
         self.assertEqual(warning["until"], "2026-11-01T15:36:32Z")   # NWS expiry, for the Weather page
         self.assertNotIn("until", strike)                            # only NWS alert items carry it
         self.assertEqual(strike["title"], "Lightning 3.5 mi away")
-        self.assertEqual(strike["detail"], "4 strikes in 10 min. Stay in until 10:21 AM (15:21 UTC).")
+        self.assertEqual(strike["detail"], "4 strikes in 10 min. Stay in until 15:21 UTC (10:21 AM).")
         self.assertEqual(strike["ref"]["id"], "lightning-5mi-2026-11-01T14:51:32Z")
         self.assertEqual(self.items[4]["detail"], "NWS alert, not detected.")
 
@@ -156,7 +156,7 @@ class Lightning(unittest.TestCase):
                  hold_until_10mi="2026-11-01T15:20:00Z")
         item = build(w=weather(lightning=l))[0]
         self.assertEqual((item["category"], item["title"]), ("lightning_10mi", "Lightning 8.2 mi away"))
-        self.assertIn("Wait until 10:20 AM (15:20 UTC)", item["detail"])
+        self.assertIn("Wait until 15:20 UTC (10:20 AM)", item["detail"])
 
     def test_stale_lightning_not_used(self):
         w = weather(lightning=dict(QUIET_LIGHTNING, within_5mi=True))
@@ -169,7 +169,7 @@ class Lightning(unittest.TestCase):
         self.assertEqual(cats(build(w=weather(outlook=outlook("likely", 1)))), ["lightning_likely_soon"])
         later = build(w=weather(outlook=outlook("likely", 4)))[0]
         self.assertEqual((later["category"], later["title"]),
-                         ("lightning_outlook", "Lightning likely after 1:52 PM (18:52 UTC)"))
+                         ("lightning_outlook", "Lightning likely after 18:52 UTC (1:52 PM)"))
         self.assertEqual(build(w=weather(outlook=outlook("possible", 1)))[0]["category"], "lightning_outlook")
 
     def test_detected_and_forecast_together(self):
@@ -371,6 +371,25 @@ class Endpoints(unittest.TestCase):
         self.assertEqual(self.client.post("/api/alerts/ack", json={"id": "urn:nope"}).status_code, 404)
         self.assertEqual(self.client.post("/api/alerts/ack", json={"x": 1}).status_code, 400)
         self.assertEqual(self.client.post("/api/alerts/ack", data="junk").status_code, 400)
+
+
+class MainClockTest(unittest.TestCase):
+    """display.main_clock decides which time comes first in the wording (Dan, 2026-11-11)."""
+
+    def test_default_is_utc_first(self):
+        dt = datetime(2026, 11, 1, 15, 36, tzinfo=timezone.utc)
+        self.assertEqual(alerts.clock_text(dt), "15:36 UTC (10:36 AM)")
+
+    def test_local_first(self):
+        dt = datetime(2026, 11, 1, 15, 36, tzinfo=timezone.utc)
+        self.assertEqual(alerts.clock_text(dt, "local"), "10:36 AM (15:36 UTC)")
+        s = copy.deepcopy(SETTINGS)
+        s["display"]["main_clock"] = "local"
+        items = alerts.build(prop(), weather([nws("Tornado Warning", "warning", "site_hazard",
+                                                  expires="2026-11-01T15:36:00Z")]), s, NOW)
+        self.assertTrue(items[0]["detail"].endswith("Until 10:36 AM (15:36 UTC)."), items[0]["detail"])
+        # The setting only applies to that list: the next default build is UTC first again.
+        self.assertEqual(alerts.clock_text(dt), "15:36 UTC (10:36 AM)")
 
 
 class EndedTest(unittest.TestCase):

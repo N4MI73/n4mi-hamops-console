@@ -47,7 +47,7 @@ function powerWords(p) {
 function shortStart(iso) {
   const d = new Date(iso);
   const day = new Date().toDateString() === d.toDateString() ? "" : d.toLocaleDateString([], {weekday: "short"}) + " ";
-  return day + localClock(d);
+  return day + mainTime(d);
 }
 
 function renderPi(s) {

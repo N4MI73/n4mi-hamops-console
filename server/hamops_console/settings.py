@@ -26,6 +26,7 @@ DEFAULTS = {
         "field": {"callsign": "N0CALL", "grid_source": "manual", "grid": "AA00aa"},
     },
     "display": {
+        "main_clock": "utc",          # "utc" or "local": shown large and first everywhere (2026-11-11)
         "night_style": "dim",
         "day_brightness_pct": 80,
         "night_brightness_pct": 20,

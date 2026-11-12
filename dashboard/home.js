@@ -158,9 +158,9 @@ function renderWeather() {
     : "";
   $("wind").textContent = showC && c.wind_mph !== null
     ? `${dash(c.wind_dir)} ${Math.round(c.wind_mph)} mph${c.gust_mph !== null ? ", gust " + Math.round(c.gust_mph) : ""}` : "--";
-  $("rain").textContent = !showC || c.rain_rate_in_hr === null ? "--"
+  $("rain").textContent = !showC || c.rain_rate_in_hr == null ? "--"
     : c.rain_rate_in_hr === 0 ? "None" : `${c.rain_rate_in_hr.toFixed(2)} in/hr`;
-  $("pressure").textContent = showC && c.pressure_inhg !== null
+  $("pressure").textContent = showC && c.pressure_inhg != null
     ? `${c.pressure_inhg.toFixed(2)} inHg${c.station ? "" : " (station)"}` : "--";
 
   // Forecast: the first NWS period, or why there isn't one.
@@ -182,7 +182,7 @@ function renderLightningLine(l, fc) {
   const dot = $("lt-dot"), text = $("lt-text");
   const outlook = fc && fc.lightning_outlook;
   const outlookWords = outlook
-    ? `${outlook.level} ${new Date(outlook.start) <= new Date() ? "now" : "after " + localClock(new Date(outlook.start))} (forecast)`
+    ? `${outlook.level} ${new Date(outlook.start) <= new Date() ? "now" : "after " + mainTime(new Date(outlook.start))} (forecast)`
     : "none forecast";
   if (!l) {                                  // Field Mode: no Tempest, forecast only
     setDot(dot, outlook ? "fair" : (fc && fc.status === "ok" ? "good" : ""));
@@ -203,7 +203,7 @@ function renderLightningLine(l, fc) {
     text.textContent = `Lightning ${dash(l.closest_mi)} mi · within 10 mi${stale}`;
   } else {
     setDot(dot, outlook ? "fair" : "good");
-    const cleared = l.cleared_at ? ` · cleared ${localClock(new Date(l.cleared_at))}` : "";
+    const cleared = l.cleared_at ? ` · cleared ${mainTime(new Date(l.cleared_at))}` : "";
     text.textContent = `No lightning nearby · ${outlookWords}${cleared}${stale}`;
   }
 }
@@ -226,7 +226,7 @@ function renderNwsLine(a) {
     const n = count(kind);
     if (n) parts.push(`${n} ${n === 1 ? one : many}`);
   }
-  const checked = a.issued_at ? ` · checked ${localClock(new Date(a.issued_at))}` : "";
+  const checked = a.issued_at ? ` · checked ${mainTime(new Date(a.issued_at))}` : "";
   const stale = a.status === "stale" ? " (STALE)" : "";
   if (!items.length) {
     setDot(dot, a.status === "stale" ? "fair" : "good");

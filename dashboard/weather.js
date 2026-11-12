@@ -25,7 +25,7 @@ function setRow(id, cls, what, note) {
 function whenWords(iso) {           // "now" or "after 3 PM"
   if (!iso) return "";
   const d = new Date(iso);
-  return d <= new Date() ? "now" : `after ${localClock(d)}`;
+  return d <= new Date() ? "now" : `after ${mainTime(d)}`;
 }
 function hourLabel(iso) {           // "1P", "12A" -- local hours, as in the mockup
   const h = new Date(iso).getHours();
@@ -53,17 +53,17 @@ function renderLightningRow(l, fc) {
     if (l.within_5mi) {
       // The time to stay in comes first in the note, so it's never the part that gets cut.
       setRow("row-lightning", "bad", `Lightning ${dash(l.closest_mi)} mi${stale}`,
-        (l.hold_until_5mi ? `Stay in until ${localClock(new Date(l.hold_until_5mi))} · ` : "")
+        (l.hold_until_5mi ? `Stay in until ${mainTime(new Date(l.hold_until_5mi))} · ` : "")
         + `${dash(l.strikes_recent)} in ${dash(l.window_min)} min · Home Tempest`);
     } else if (l.within_10mi) {
       setRow("row-lightning", "fair", `Lightning within 10 mi${stale}`,
-        (l.hold_until_10mi ? `Hold until ${localClock(new Date(l.hold_until_10mi))} · ` : "")
+        (l.hold_until_10mi ? `Hold until ${mainTime(new Date(l.hold_until_10mi))} · ` : "")
         + `closest ${dash(l.closest_mi)} mi · Home Tempest`);
     } else if (outlook) {
       setRow("row-lightning", "fair", `Lightning ${outlook.level} ${whenWords(outlook.start)}`,
         `NWS forecast, not detected · none within 10 mi${stale}`);
     } else {
-      const cleared = l.cleared_at ? ` · hold cleared ${localClock(new Date(l.cleared_at))}` : "";
+      const cleared = l.cleared_at ? ` · hold cleared ${mainTime(new Date(l.cleared_at))}` : "";
       setRow("row-lightning", "good", `No lightning within 10 mi${stale}`, `Home Tempest · none forecast${cleared}`);
     }
     return;
@@ -105,7 +105,7 @@ function renderAlertsRow(a) {
     const top = hazards[0];
     // Short line: when it ends, how many more, any notices. The full hazard text is on the
     // Home screen's card and (later) the Alerts page.
-    const parts = [top.until ? `Until ${localClock(new Date(top.until))}` : (top.detail || "")];
+    const parts = [top.until ? `Until ${mainTime(new Date(top.until))}` : (top.detail || "")];
     if (hazards.length > 1) parts.push(`+${hazards.length - 1} more`);
     if (noticeWords) parts.push(noticeWords);
     setRow("row-alerts", top.color === "red" ? "bad" : "fair", top.title + stale, parts.filter(Boolean).join(" · "));
@@ -225,7 +225,7 @@ function renderHours() {
   tile.classList.toggle("is-stale", !!fc && fc.status === "stale");
   const head = $("hours-fresh");
   if (fc && fc.status === "stale") setFresh(head, fc);
-  else { head.className = "fresh"; head.textContent = fc && fc.issued_at ? `NWS hourly · forecast updated ${localClock(new Date(fc.issued_at))}` : "NWS hourly"; }
+  else { head.className = "fresh"; head.textContent = fc && fc.issued_at ? `NWS hourly · forecast updated ${mainTime(new Date(fc.issued_at))}` : "NWS hourly"; }
 
   const grid = $("hours"), msg = $("hours-msg");
   grid.hidden = !hours.length;

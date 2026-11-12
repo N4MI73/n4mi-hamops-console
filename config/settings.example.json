@@ -6,6 +6,7 @@
     "field": {"callsign": "N0CALL", "grid_source": "manual", "grid": "AA00aa"}
   },
   "display": {
+    "main_clock": "utc",
     "night_style": "dim",
     "day_brightness_pct": 80,
     "night_brightness_pct": 20,

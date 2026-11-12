@@ -37,13 +37,27 @@ function recall(key, fallback) {
 
 // ----------------------------------------------------------------- time words
 
+/* The main clock (display.main_clock, Dan 2026-11-11): "utc" or "local" is shown large and
+   first everywhere; the other follows, smaller. Changed by tapping the big time in the status
+   bar or on the Settings Display tab. Remembered in this browser so a new screen doesn't
+   flicker to UTC before the settings arrive. */
+function mainClock() {
+  const s = state.data.settings && state.data.settings.display && state.data.settings.display.main_clock;
+  const m = s || recall("hoc.mainClock", "utc");
+  return m === "local" ? "local" : "utc";
+}
 function localClock(d) {
   return d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
 }
-function clockPair(iso) {            // "10:21 AM (15:21 UTC)" -- local first, UTC beside it
+function utcClock(d) { return d.toISOString().slice(11, 16) + "Z"; }
+/* A time standing alone ("Until 3:04 PM" / "Until 20:04Z"): the main clock's. */
+function mainTime(d) { return mainClock() === "local" ? localClock(d) : utcClock(d); }
+/* Both times, main first: "15:21 UTC (10:21 AM)" or "10:21 AM (15:21 UTC)". */
+function clockPair(iso) {
   if (!iso) return "--";
   const d = new Date(iso);
-  return `${localClock(d)} (${d.toISOString().slice(11, 16)} UTC)`;
+  const utc = `${d.toISOString().slice(11, 16)} UTC`;
+  return mainClock() === "local" ? `${localClock(d)} (${utc})` : `${utc} (${localClock(d)})`;
 }
 function ageWords(sec) {
   if (sec === null || sec === undefined) return "--";
@@ -58,11 +72,51 @@ function liveAge(block) {           // the service's age, plus time since the re
 
 function tickClock() {
   const now = new Date();
-  $("utc").textContent = now.toISOString().slice(11, 16) + "Z";
   const zone = new Intl.DateTimeFormat([], {timeZoneName: "short"}).formatToParts(now)
     .find(p => p.type === "timeZoneName");
+  const tz = zone ? zone.value : "";
   const day = now.toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short"});
-  $("local").textContent = `${localClock(now)}${zone ? " " + zone.value : ""} · ${day}`;
+  // The ids stay "utc" (large) and "local" (small); what they hold follows the main clock.
+  if (mainClock() === "local") {
+    $("utc").textContent = localClock(now);
+    $("local").textContent = [tz, utcClock(now), day].filter(Boolean).join(" · ");
+  } else {
+    $("utc").textContent = utcClock(now);
+    $("local").textContent = `${localClock(now)}${tz ? " " + tz : ""} · ${day}`;
+  }
+}
+
+/* Tap the big time to swap UTC and local. Saved on the Pi (PUT /api/settings), so the
+   choice survives a restart and the Settings Display tab shows it. The screen changes at
+   once; if saving fails it changes back. */
+async function swapMainClock() {
+  const before = mainClock();
+  const next = before === "local" ? "utc" : "local";
+  const apply = m => {
+    state.data.settings = state.data.settings || {};
+    state.data.settings.display = Object.assign({}, state.data.settings.display, {main_clock: m});
+    remember("hoc.mainClock", m);
+    tickClock();
+    if (state.receivedAt) { renderStatusBar(); screen.render(); }
+  };
+  apply(next);
+  try {
+    const r = await fetch("/api/settings", {method: "PUT", headers: {"Content-Type": "application/json"},
+                                            body: JSON.stringify({display: {main_clock: next}})});
+    if (!r.ok) throw new Error(String(r.status));
+  } catch (e) {
+    apply(before);
+    return;
+  }
+  poll();   // the service's own wording ("Until ...") follows on the next reply
+}
+function setUpClockTap() {
+  const clock = document.querySelector(".status-bar .clock");
+  if (!clock) return;
+  clock.setAttribute("role", "button");
+  clock.setAttribute("aria-label", "Swap UTC and local time");
+  clock.classList.add("tappable");
+  clock.addEventListener("click", swapMainClock);
 }
 
 // ----------------------------------------------------------------- freshness (one function)
@@ -197,6 +251,7 @@ async function poll() {
     ]);
     if (wantSettings) settingsAt = Date.now();
     Object.assign(state.data, {propagation, weather, alerts, system, settings});
+    if (settings && settings.display && settings.display.main_clock) remember("hoc.mainClock", settings.display.main_clock);
     state.receivedAt = Date.now();
     $("service-down").hidden = true;
     renderStatusBar();
@@ -212,6 +267,7 @@ async function poll() {
    render() after every poll, tick() every second, slow() every 10 s (ages). */
 function startScreen(fns) {
   Object.assign(screen, fns);
+  setUpClockTap();
   const refresh = $("refresh");
   if (refresh) refresh.addEventListener("click", () => poll());
   tickClock();

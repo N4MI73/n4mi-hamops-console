@@ -37,11 +37,12 @@ block is current, because an alert missing from an out-of-date list hasn't
 necessarily ended.
 """
 
+import contextvars
 import json
 import logging
 import os
 import threading
-from datetime import timedelta
+from datetime import timedelta, timezone
 from pathlib import Path
 
 from . import freshness
@@ -63,10 +64,18 @@ CRITICAL = {"hazard_warning", "lightning_5mi"}
 
 # ---------------------------------------------------------------- wording helpers
 
-def clock_text(dt):
-    """'10:30 AM (15:30 UTC)': the Pi's local time first, UTC beside it."""
-    local = dt.astimezone()
-    return f"{local.strftime('%I:%M %p').lstrip('0')} ({dt.strftime('%H:%M')} UTC)"
+# Which time comes first in the wording ("utc" or "local"), from the display.main_clock
+# setting; set by build() for the list it is building (Dan, 2026-11-11).
+_MAIN_CLOCK = contextvars.ContextVar("main_clock", default="utc")
+
+
+def clock_text(dt, main=None):
+    """The main clock's time first, the other beside it:
+    '15:30 UTC (10:30 AM)' with UTC first, '10:30 AM (15:30 UTC)' with local first."""
+    main = main or _MAIN_CLOCK.get()
+    local = dt.astimezone().strftime('%I:%M %p').lstrip('0')
+    utc = dt.astimezone(timezone.utc).strftime('%H:%M')
+    return f"{local} ({utc} UTC)" if main == "local" else f"{utc} UTC ({local})"
 
 
 def _until(iso_text):
@@ -222,7 +231,17 @@ def _propagation(prop, t):
 # ---------------------------------------------------------------- the list
 
 def build(propagation, weather, settings, now, acks=None):
-    """The ranked items for GET /api/alerts."""
+    """The ranked items for GET /api/alerts. Times in the wording follow the
+    display.main_clock setting."""
+    main = ((settings or {}).get("display") or {}).get("main_clock")
+    token = _MAIN_CLOCK.set(main if main in ("utc", "local") else "utc")
+    try:
+        return _build(propagation, weather, settings, now, acks)
+    finally:
+        _MAIN_CLOCK.reset(token)
+
+
+def _build(propagation, weather, settings, now, acks=None):
     t = settings["thresholds"]
     weather = weather or {}
     alerts = weather.get("alerts") or {}

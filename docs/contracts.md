@@ -27,7 +27,7 @@ The service listens on `127.0.0.1:8090` only: nothing else on the network can re
 
 ## 2. Rules that apply everywhere
 
-- **Times:** ISO 8601 in UTC with `Z` (e.g. `2026-11-01T14:52:10Z`). The dashboard formats them (UTC first, local beside it). Wording the service writes itself (alert `detail`) gives local time first with UTC in brackets, e.g. "Until 10:36 AM (15:36 UTC)".
+- **Times:** ISO 8601 in UTC with `Z` (e.g. `2026-11-01T14:52:10Z`). The dashboard formats them. **Changed 11 November 2026 (Dan): the main clock.** The setting `display.main_clock` (`"utc"`, the default, or `"local"`) decides which time is shown large and first everywhere: the status bar ("00:09Z  7:09 PM EST · Wed 11 Nov", or "7:09 PM  EST · 00:09Z · Wed 11 Nov"), pairs of times ("15:36 UTC (10:36 AM)" or "10:36 AM (15:36 UTC)"), and a time standing alone ("Until 20:04Z" or "Until 3:04 PM"). Wording the service writes itself (alert `detail`) follows the same setting, so with the default it now reads "Until 15:36 UTC (10:36 AM)" (before 11 November it was always local first). It is changed by tapping the big time in the status bar (saved at once through `PUT /api/settings`, so it survives a restart) or on the Settings Display tab.
 - **Units:** °F, mph, inches, miles for weather; °C for the Pi's CPU temperature. NWS's metric values are converted by the service.
 - **Missing data:** a field the service can't fill is `null`, never left out and never a made-up zero. The dashboard shows `--` for `null`.
 - **Unknown fields:** the dashboard ignores fields it doesn't know, so the service can add fields without breaking it.
@@ -356,7 +356,7 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
       "critical": true,
       "acknowledged": false,
       "title": "Severe Thunderstorm Warning",
-      "detail": "60 mph wind gusts and quarter size hail. Until 10:36 AM (15:36 UTC).",
+      "detail": "60 mph wind gusts and quarter size hail. Until 15:36 UTC (10:36 AM).",
       "since": null,
       "until": "2026-11-01T15:36:32Z",
       "kind": "warning",
@@ -477,7 +477,7 @@ Everything the Settings screen may show and change. The service's listening addr
     "home":  {"callsign": "N0CALL", "grid_source": "manual", "grid": "FM18lv"},
     "field": {"callsign": "N0CALL", "grid_source": "manual", "grid": "FM18lw"}
   },
-  "display": {"night_style": "dim", "day_brightness_pct": 80, "night_brightness_pct": 20,
+  "display": {"main_clock": "utc", "night_style": "dim", "day_brightness_pct": 80, "night_brightness_pct": 20,
               "night_start": "22:00", "night_end": "07:00"},
   "sources": {"propmon_url": "http://propmon.example:8076", "sentinel_url": "http://sentinel.example:8085"},
   "thresholds": {
@@ -557,5 +557,5 @@ Until Phase 3, in Field Mode the alerts and conditions blocks are `unavailable` 
 - **Field Day operating profile.** Independent of data source and economy mode. It only adds display elements; it never changes how data is fetched, ranked or aged, so weather-alert priority and freshness are identical in both profiles. Event information is hidden in General HF. First version: a timer in a status-bar pill, never on the Priority Card, with its settings (operations start and end, entered in UTC). **Changed 5 November 2026 (evening):** the profile can be switched on days ahead; until the operations day the pill is a quiet reminder ("Field Day · Sat 30 Jan · ops 19:00Z"). Setup then begins on its own at local midnight on the operations day and counts down to the start of operations (time left to finish setup); there is no Start setup button. Then Operations (time remaining), then "Operations complete" until the profile is switched off. Times are hours:minutes. Mockups approved 5 November (four pill states, Settings in tabs). Later (Phase 2): setup readiness with manually updated categories and states Not started / In progress / Ready / Needs attention, where Ready means tested and working. A compact "X of Y ready" opens a detail panel; during operations a small indicator shows only when something isn't Ready. Candidates: UTC/local on the timer, one next-milestone reminder. Needs a mockup before building.
 - **Wi-Fi networks from the touchscreen**, with Field Mode (Phase 3). Mockups approved 5 November (Wi-Fi tab with saved networks in preference order and nearby networks; join screen with on-screen keyboard). Needs a narrow polkit rule letting user `hamops` save, join and scan Wi-Fi (checked on the Pi 5 November).
 - **Settings in tabs** (approved 5 November): Station & profile (Data source, station, Operating profile, Field Day times, economy mode) · Display · Data sources · Wi-Fi.
-- **Main clock, UTC or local first** (open, 5 November): a Display-tab setting is drawn as a proposal; tapping the large time to swap the two is the alternative to weigh. Default stays UTC first.
+- **Main clock, UTC or local first** (opened 5 November; **settled 11 November, Dan: both ways**): one saved setting, `display.main_clock`, changed by tapping the large time or on the Display tab; default UTC first. Built 11 November (see Times, at the top).
 - **`POST /api/power`** with the Shut down dialog. (The **NOAA Weather Radio** block was built 7 November 2026, §5.)

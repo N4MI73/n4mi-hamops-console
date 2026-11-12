@@ -125,7 +125,10 @@ def check(changes, current):
         else:
             for field, value in display.items():
                 where = f"display.{field}"
-                if field == "night_style":
+                if field == "main_clock":
+                    if value not in ("utc", "local"):
+                        errors.append(f"{where} must be 'utc' or 'local'")
+                elif field == "night_style":
                     if value not in ("dim", "red"):
                         errors.append(f"{where} must be 'dim' or 'red'")
                 elif field in ("day_brightness_pct", "night_brightness_pct"):
