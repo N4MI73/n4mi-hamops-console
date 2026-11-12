@@ -285,6 +285,36 @@ function syncSleep() {
   }
 }
 
+// ----------------------------------------------------------------- Red night style (2026-11-12)
+
+/* Night style "Red": during the night times in Settings, the whole page is shown in red
+   only, to protect night vision. A colour filter turns every colour into its brightness in
+   red, so green/amber/red no longer differ: alerts rely on their words and the flashing
+   border, as approved with the design (2026-10-12). "Dim" changes only the backlight. The
+   service decides whether it is night (the `display` block); Settings can preview it. */
+let redPreviewUntil = 0;
+
+function syncNightStyle() {
+  if (!document.getElementById("hoc-red")) {
+    document.body.insertAdjacentHTML("beforeend",
+      '<svg aria-hidden="true" width="0" height="0" style="position:absolute">' +
+      '<filter id="hoc-red" color-interpolation-filters="sRGB">' +
+      '<feColorMatrix type="matrix" values="0.30 0.75 0.15 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/>' +
+      '</filter></svg>');
+  }
+  const d = (state.data.system && state.data.system.display) || {};
+  const style = ((state.data.settings || {}).display || {}).night_style;
+  const on = (d.night === true && style === "red") || Date.now() < redPreviewUntil;
+  document.documentElement.classList.toggle("night-red", on);
+}
+
+/* Settings' Preview button: red for `sec` seconds, whatever the time. */
+function previewRed(sec) {
+  redPreviewUntil = Date.now() + sec * 1000;
+  syncNightStyle();
+  setTimeout(syncNightStyle, sec * 1000 + 50);
+}
+
 // ----------------------------------------------------------------- Shut down (2026-11-11)
 
 /* The approved Shut down dialog: large Cancel on the left, Restart in the middle, red
@@ -392,6 +422,7 @@ async function poll() {
     renderStatusBar();
     renderBadge();
     syncSleep();
+    syncNightStyle();
     screen.render();
     maybeReturnHome();
     return true;

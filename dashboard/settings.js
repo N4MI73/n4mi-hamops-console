@@ -186,6 +186,7 @@ $("mc-utc").addEventListener("click", () => { if (mainClock() !== "utc") saveOrS
 $("mc-local").addEventListener("click", () => { if (mainClock() !== "local") saveOrSay({display: {main_clock: "local"}}); });
 $("ns-dim").addEventListener("click", () => saveOrSay({display: {night_style: "dim"}}));
 $("ns-red").addEventListener("click", () => saveOrSay({display: {night_style: "red"}}));
+$("red-preview").addEventListener("click", () => previewRed(10));
 
 for (const [id, key] of [["day-b", "day_brightness_pct"], ["night-b", "night_brightness_pct"]]) {
   const slider = $(id);

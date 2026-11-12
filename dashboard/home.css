@@ -206,3 +206,17 @@ button:disabled { cursor: default; }
 .sd-restart { flex: 1 1 0; }
 .sd-shutdown { flex: 1 1 0; color: #FFFFFF !important; background: #5A1A17 !important; border: 2px solid #E0605A !important; }
 .sd-buttons button:disabled.sd-cancel, .sd-buttons button:disabled.sd-shutdown { opacity: 0.5; }
+
+/* -- Red night style (2026-11-12): every colour becomes its brightness in red only */
+html.night-red { filter: url(#hoc-red); }
+/* In red, colour can't separate the band ratings, so brightness does: GOOD brightest with
+   a bright outline, FAIR mid, POOR dim. The words stay as they are. */
+html.night-red .band span, html.night-red .cell span { color: #4A4A4A; }
+html.night-red .band span.fair, html.night-red .cell.fair span { color: #9A9A9A; }
+html.night-red .band span.good, html.night-red .cell.good span { color: #FFFFFF; }
+html.night-red .band:has(span.good) { box-shadow: inset 0 0 0 2px #FFFFFF; }
+html.night-red .cell.good { border-color: #FFFFFF; }
+html.night-red .cell.fair { border-color: #707070; }
+html.night-red .cell:not(.good):not(.fair) b, html.night-red .band:not(:has(span.good)):not(:has(span.fair)) b { color: #6A6A6A; }
+html.night-red .band span { font-size: 18px; font-weight: 800; }
+html.night-red .cell span { font-size: 22px; font-weight: 800; }

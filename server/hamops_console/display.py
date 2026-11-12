@@ -13,7 +13,7 @@ between night_start and night_end (local time; the night may cross midnight).
 Sleep turns the backlight off; the dashboard puts a black cover over the page so
 the touch that wakes the screen doesn't also press whatever was under the finger.
 Night style (dim/red) is not applied here: "red" is a page colour, not a backlight
-setting, and isn't built yet.
+setting; the dashboard applies it from this block's `night` flag (common.js, 2026-11-12).
 """
 
 import logging
