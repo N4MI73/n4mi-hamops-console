@@ -5,7 +5,10 @@ Phase 1 (2026-11-02): GET /, /api/propagation, /api/weather, /api/alerts,
 GET/PUT /api/settings with POST /api/settings/test. 2026-11-07: POST
 /api/weather-radio/refresh. 2026-11-10: the Alerts page (/alerts), and
 /api/alerts also lists NWS alerts ended in the last 24 hours. The System page
-(/system). 2026-11-11: the Settings screen (/settings).
+(/system). 2026-11-11: the Settings screen (/settings); later the same day
+POST /api/display (Sleep and wake) and POST /api/power (Shut down, Restart),
+the `display` block in /api/system, and pages and their files sent with
+"Cache-Control: no-cache" so a `git pull` shows on the screen without a reboot.
 
 The service listens on 127.0.0.1 by default, so only the Pi's own kiosk
 browser can reach it. To look at it from another computer while developing,
@@ -16,7 +19,8 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from . import __version__, alerts as alerts_mod, freshness, settings as settings_mod, settings_api, system_info
+from . import __version__, alerts as alerts_mod, freshness, power, settings as settings_mod, settings_api, system_info
+from .display import Display
 from .propagation import PropagationSource
 from .weather import WeatherSource
 
@@ -25,15 +29,27 @@ DASHBOARD_DIR = REPO_ROOT / "dashboard"
 
 
 def create_app(settings=None, propagation=None, weather=None, acks=None, ended=None, dashboard_dir=DASHBOARD_DIR,
-               settings_file=None, test_connections=settings_api.test_connections):
+               settings_file=None, test_connections=settings_api.test_connections, display=None,
+               power_runner=None):
     settings = settings or settings_mod.load()
     store = settings_api.SettingsStore(settings, settings_file)
     propagation = propagation or PropagationSource(settings)
     weather = weather or WeatherSource(settings)
     acks = acks or alerts_mod.AckStore()
     ended = ended or alerts_mod.EndedStore()
+    display = display or Display(settings)
     started_at = freshness.utcnow()
     app = Flask(__name__, static_folder=None)
+    app.extensions["hamops_display"] = display     # __main__ starts its day/night check
+
+    @app.after_request
+    def revalidate(response):
+        """Pages, scripts and styles: the browser must ask each time whether its copy is
+        still current (the service answers "not modified" when it is). Without this,
+        Chromium kept using old files after a `git pull` until the Pi was rebooted.
+        Replies that already say how to cache (the JSON: no-store) are left alone."""
+        response.headers.setdefault("Cache-Control", "no-cache")
+        return response
 
     def envelope(**blocks):
         body = {"mode": settings["mode"], "generated_at": freshness.iso(freshness.utcnow())}
@@ -139,6 +155,8 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
     @app.put("/api/settings")
     def api_settings_put():
         ok, body = store.update(request.get_json(silent=True))
+        if ok:
+            display.poke()          # new brightness or night times take effect at once
         return jsonify(body), (200 if ok else 400)
 
     @app.post("/api/settings/test")
@@ -154,7 +172,34 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
 
     @app.get("/api/system")
     def api_system():
-        return envelope(system=system_info.block(__version__, started_at))
+        return envelope(system=system_info.block(__version__, started_at), display=display.block())
+
+    @app.post("/api/display")
+    def api_display():
+        """Sleep (backlight off) or wake: {"action": "sleep" | "wake"}. Answers with the
+        display block; `control: false` means the screen couldn't be changed (the udev
+        rule isn't installed) though the dashboard still covers the page."""
+        body = request.get_json(silent=True)
+        action = body.get("action") if isinstance(body, dict) else None
+        if action not in ("sleep", "wake"):
+            return jsonify({"error": "send {\"action\": \"sleep\"} or {\"action\": \"wake\"}"}), 400
+        (display.sleep if action == "sleep" else display.wake)()
+        response = jsonify({"display": display.block()})
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.post("/api/power")
+    def api_power():
+        """Shut down or restart the Pi: {"action": "shutdown" | "restart"}. The dashboard
+        asks for confirmation first (the approved Shut down dialog)."""
+        body = request.get_json(silent=True)
+        action = body.get("action") if isinstance(body, dict) else None
+        if action not in power.COMMANDS:
+            return jsonify({"error": "send {\"action\": \"shutdown\"} or {\"action\": \"restart\"}"}), 400
+        ok, message = power.run(action, **({"runner": power_runner} if power_runner else {}))
+        if not ok:
+            return jsonify({"error": message}), 503
+        return jsonify({"started": action})
 
     @app.get("/healthz")
     def healthz():

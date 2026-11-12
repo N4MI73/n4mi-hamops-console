@@ -8,6 +8,8 @@ Files that turn a fresh Raspberry Pi OS Lite install into the console's kiosk di
 | `labwc/autostart` | `~/.config/labwc/autostart` | Rotates the display to landscape, waits for the console service, and runs Chromium fullscreen on it, restarting it if it closes |
 | `profile-kiosk.sh` | appended to `~/.profile` | Starts labwc on the Pi's own screen (tty1) only. SSH sessions are unaffected |
 | `systemd/hamops-console.service` | `/etc/systemd/system/hamops-console.service` | Runs the console service at boot and restarts it if it stops |
+| `udev/99-hamops-backlight.rules` | `/etc/udev/rules.d/99-hamops-backlight.rules` | Lets the console service set the screen brightness and switch the backlight off for Sleep (gives the `video` group write access to the backlight files) |
+| `polkit/49-hamops-power.rules` | `/etc/polkit-1/rules.d/49-hamops-power.rules` | Lets the `hamops` user shut down and restart the Pi, for the touchscreen's Shut down dialog. Power-off and reboot only |
 
 Also needed:
 
@@ -43,3 +45,20 @@ Then copy in the kiosk start-up file, which points Chromium at the service: `cp 
 The unit file assumes the user `hamops` and the path above; edit both lines if yours differ. Logs: `journalctl -u hamops-console`.
 
 **Updating** after new commits: `cd ~/hamops-console && git pull && sudo systemctl restart hamops-console`. Don't edit files inside `~/hamops-console` on the Pi; `git pull` expects it unchanged. Settings stay in `~/.config/hamops-console/`.
+
+## Screen brightness, Sleep and Shut down (added 11 November 2026)
+
+Two permission rules, installed once (SSH window):
+
+```
+sudo cp ~/hamops-console/pi/udev/99-hamops-backlight.rules /etc/udev/rules.d/
+sudo udevadm control --reload
+sudo udevadm trigger --subsystem-match=backlight --action=add
+ls -l /sys/class/backlight/*/brightness /sys/class/backlight/*/bl_power   # both group video, rw for the group
+sudo cp ~/hamops-console/pi/polkit/49-hamops-power.rules /etc/polkit-1/rules.d/
+sudo chmod 644 /etc/polkit-1/rules.d/49-hamops-power.rules
+```
+
+The `hamops` user must be in the `video` group (`id hamops`); it is on a standard Raspberry Pi OS install. polkit reads new rules by itself (its rules folder can only be listed with `sudo`). Raspberry Pi OS already makes `brightness` writable by `video`; the udev rule adds `bl_power`, which Sleep uses for a full backlight-off. **To undo:** `sudo rm /etc/udev/rules.d/99-hamops-backlight.rules /etc/polkit-1/rules.d/49-hamops-power.rules` and reboot.
+
+Since 11 November 2026 the pages are sent so Chromium checks for new versions each time: after `git pull` and `sudo systemctl restart hamops-console` the screen shows the change at its next page load, with no reboot.

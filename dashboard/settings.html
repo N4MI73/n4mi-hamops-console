@@ -97,7 +97,7 @@
       <input class="st-slider" id="day-b" type="range" min="5" max="100" step="5">
       <label class="st-slider-label" for="night-b"><span>Night brightness</span><span id="night-b-val">--</span></label>
       <input class="st-slider" id="night-b" type="range" min="5" max="100" step="5">
-      <span class="st-note warn">Saved now; the screen follows these once brightness control is added (with Sleep and Shut down).</span>
+      <span class="st-note" id="bright-note">--</span>
     </section>
 
     <section class="tile" aria-label="Night">
@@ -151,7 +151,7 @@
     <button disabled>Help<span class="soon">Coming</span></button>
     <span class="st-msg" id="msg" role="status"></span>
     <div class="spacer"></div>
-    <button class="shutdown" disabled>Shut down…<span class="soon">Coming</span></button>
+    <button class="shutdown" id="shutdown">Shut down…</button>
   </footer>
 
 </div>

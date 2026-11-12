@@ -120,6 +120,17 @@ function renderDisplay() {
       $(id + "-val").textContent = typeof d[key] === "number" ? `${d[key]}%` : "--";
     }
   }
+  const dc = (state.data.system || {}).display;
+  const note = $("bright-note");
+  if (dc && dc.control) {
+    note.className = "st-note";
+    note.textContent = `The screen is at ${dc.night ? "night" : "day"} brightness now. Changes show within a few seconds.`;
+  } else {
+    note.className = "st-note warn";
+    note.textContent = dc
+      ? "Saved, but this Pi can't change the screen's brightness yet (the brightness permission isn't installed)."
+      : "--";
+  }
   press("ns-dim", d.night_style !== "red");
   press("ns-red", d.night_style === "red");
   $("f-night_start").textContent = d.night_start || "--";

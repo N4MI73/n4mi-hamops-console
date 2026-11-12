@@ -92,7 +92,8 @@ The dashboard polls the service every 15 seconds.
 | `GET /api/settings` | Settings (§8) | Yes |
 | `PUT /api/settings` | Change settings; returns the saved settings (§8) | Yes |
 | `POST /api/settings/test` | Test connections (§8) | Yes |
-| `POST /api/power` | `{"action": "shutdown" \| "restart"}`, from the Shut down dialog | Not yet |
+| `POST /api/display` | `{"action": "sleep" \| "wake"}`: backlight off or back on (§7) | Yes (11 Nov 2026) |
+| `POST /api/power` | `{"action": "shutdown" \| "restart"}`, from the Shut down dialog (§7) | Yes (11 Nov 2026) |
 
 Errors from `POST`/`PUT` endpoints are JSON: `{"error": "..."}` or, for settings, `{"errors": [...]}`, with HTTP 400 (bad request), 404 (no such item) or 409 (nothing to act on).
 
@@ -460,6 +461,12 @@ No body. Ends both lightning holds early, on the operator's word, until the next
 - `clock.source` is `ntp`, `gps` or `rtc`. GPS time is used only when it's plausible against the RTC.
 - Readings the service can't take (e.g. off the Pi) are `null`.
 - **Changed 10 November 2026 (System page):** added `memory_used_gb` / `memory_total_gb`, `network.wifi_signal_pct` (0–100, from NetworkManager's last scan with `--rescan no`, so reading it never starts a scan; `null` off Wi-Fi) and `rtc` (the Pi 5's real-time-clock backup battery: `battery_v` in volts and whether `charging` is on, read from the RTC's sysfs folder). `network.internet` and `network.home_sources_reachable`, drawn in earlier drafts, were never built: the screens judge the internet by whether NWS answers (the forecast block) and the home sources by their own blocks.
+- **Added 11 November 2026: the `display` block**, beside `system` in the same reply:
+  `"display": {"control": true, "device": "<backlight name>", "asleep": false, "night": false, "brightness_pct": 80, "message": null}`.
+  `control` is false when the backlight's `brightness` file can't be written; `message` then gives the reason. (On the Pi, 11 November 2026: `panel_backlight@1`, max 31; Raspberry Pi OS already lets the `video` group write `brightness`, and the udev rule in `pi/udev/` adds `bl_power`, which Sleep uses when it can.) `night` is whether the night times in Settings apply now; `brightness_pct` is what the screen should be at (0 asleep). The service sets the backlight itself: day or night brightness from Settings, checked every 30 seconds and at once after a Settings change. Night style (Dim/Red) is saved but not applied yet.
+- **`POST /api/display`** `{"action": "sleep" | "wake"}` → 200 `{"display": {...}}`. Sleep turns the backlight off; the dashboard covers the page in black so the touch that wakes it doesn't also press a button. Sleep is remembered by the service (a page loaded while asleep covers itself) and a new unacknowledged critical item wakes the screen. 400 for any other action.
+- **`POST /api/power`** `{"action": "shutdown" | "restart"}` runs `systemctl poweroff` or `systemctl reboot` → 200 `{"started": "shutdown"}`; 503 `{"error": "..."}` when the Pi refuses (until the polkit rule in `pi/polkit/` is installed: "This Pi doesn't allow it yet (the polkit rule isn't installed)."). The dashboard asks first, with the approved Shut down dialog: large Cancel on the left, Restart in the middle, red Shut down on the right, and "Wait for the screen to go dark before unplugging power."
+- **Caching (11 November 2026):** pages, scripts and styles are sent with `Cache-Control: no-cache`, so Chromium checks with the service each time and a `git pull` plus service restart shows on the screen without a reboot. JSON replies keep `no-store`.
 - **The System page** (approved mockup "System page") shows three tiles: THIS PI (CPU temperature, amber "warm" from 75 °C and red "hot" from 80 °C, where the Pi 5 starts slowing itself down; load; memory; disk; power from `vcgencmd`, red for under-voltage now, amber for throttling or under-voltage since boot; uptime; version and when the service started), NETWORK · LOCATION · TIME (Wi-Fi profile and signal; internet, judged by whether NWS answers; location source and grid; GPS; clock; backup-clock battery) and DATA SOURCES (PropMon, Weather Sentinel — the worst of its three blocks — the console service, the NWS forecast and the stored weather radio list, each with its age or its state and reason). Its System button is live on every screen.
 
 ---

@@ -1,0 +1,5 @@
+# Ham Ops Console: lets the video group (the hamops user is in it) set the screen
+# brightness and switch the backlight off for Sleep. Without it those files belong to
+# root and the console service can't change the screen (Settings says so).
+# Installed to /etc/udev/rules.d/99-hamops-backlight.rules; see pi/README.md.
+SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness /sys/class/backlight/%k/bl_power", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness /sys/class/backlight/%k/bl_power"

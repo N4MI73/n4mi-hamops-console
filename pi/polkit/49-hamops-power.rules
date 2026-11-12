@@ -1,0 +1,16 @@
+// Ham Ops Console: lets the hamops user shut down and restart the Pi, so the
+// touchscreen's Shut down dialog works. The console service runs as hamops without a
+// login session, and by default polkit asks for a password in that case, which a
+// touchscreen can't give. Only power-off and reboot are allowed; nothing else.
+// Installed to /etc/polkit-1/rules.d/49-hamops-power.rules; see pi/README.md.
+polkit.addRule(function (action, subject) {
+    var allowed = [
+        "org.freedesktop.login1.power-off",
+        "org.freedesktop.login1.power-off-multiple-sessions",
+        "org.freedesktop.login1.reboot",
+        "org.freedesktop.login1.reboot-multiple-sessions"
+    ];
+    if (subject.user == "hamops" && allowed.indexOf(action.id) >= 0) {
+        return polkit.Result.YES;
+    }
+});

@@ -232,6 +232,140 @@ for (const ev of ["pointerdown", "keydown"]) {
   document.addEventListener(ev, () => { state.lastActivity = Date.now(); }, {passive: true});
 }
 
+// ----------------------------------------------------------------- Sleep (2026-11-11)
+
+/* Sleep turns the backlight off (the service does it). A black cover goes over the page
+   at the same time, so the touch that wakes the screen doesn't also press a button that
+   can't be seen. A new unacknowledged critical item wakes the screen by itself. The
+   service remembers Sleep, so a page loaded while asleep (the 3-minute return to Home)
+   covers itself again. */
+let sleepCover = null;
+let sleepChangedAt = 0;          // a reply from before the last Sleep/wake is ignored
+
+function showSleep(on) {
+  if (!sleepCover) {
+    sleepCover = document.createElement("div");
+    sleepCover.className = "sleep-cover";
+    sleepCover.hidden = true;
+    sleepCover.textContent = "Touch to wake";
+    const wakeNow = e => { e.preventDefault(); e.stopPropagation(); setSleep(false); };
+    sleepCover.addEventListener("pointerdown", wakeNow, {capture: true});
+    sleepCover.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); }, {capture: true});
+    document.body.append(sleepCover);
+  }
+  sleepCover.hidden = !on;
+}
+
+async function setSleep(on) {
+  sleepChangedAt = Date.now();
+  showSleep(on);
+  try {
+    const r = await fetch("/api/display", {method: "POST", headers: {"Content-Type": "application/json"},
+                                           body: JSON.stringify({action: on ? "sleep" : "wake"})});
+    const body = await r.json();
+    if (state.data.system && body.display) state.data.system.display = body.display;
+    return r.ok;
+  } catch (e) {
+    if (!on) showSleep(false);    // can't reach the service: never leave the page covered
+    return false;
+  }
+}
+
+function syncSleep() {
+  const d = state.data.system && state.data.system.display;
+  if (!d || Date.now() - sleepChangedAt < 5000) return;
+  showSleep(!!d.asleep);
+  if (!d.asleep) return;
+  const woke = recall("hoc.wokeFor", []);
+  const fresh = alertItems().filter(i => i.critical && !i.acknowledged && !woke.includes(i.ref.id));
+  if (fresh.length) {
+    setSleep(false).then(ok => {
+      if (ok) remember("hoc.wokeFor", woke.concat(fresh.map(i => i.ref.id)).slice(-50));
+    });
+  }
+}
+
+// ----------------------------------------------------------------- Shut down (2026-11-11)
+
+/* The approved Shut down dialog: large Cancel on the left, Restart in the middle, red
+   Shut down on the right, and "Wait for the screen to go dark before unplugging power." */
+function openShutdown() {
+  const box = document.createElement("div");
+  box.className = "sd-overlay";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  const panel = document.createElement("div");
+  panel.className = "sd-panel";
+  const title = document.createElement("div");
+  title.className = "sd-title";
+  title.textContent = "Shut down the console?";
+  const note = document.createElement("div");
+  note.className = "sd-note";
+  note.textContent = "Wait for the screen to go dark before unplugging power.";
+  const err = document.createElement("div");
+  err.className = "sd-error";
+  err.setAttribute("role", "alert");
+  const row = document.createElement("div");
+  row.className = "sd-buttons";
+  const button = (text, cls, fn) => {
+    const b = document.createElement("button");
+    b.className = cls;
+    b.textContent = text;
+    b.addEventListener("click", fn);
+    row.append(b);
+    return b;
+  };
+  const close = () => box.remove();
+  const go = async action => {
+    for (const b of row.querySelectorAll("button")) b.disabled = true;
+    err.textContent = "";
+    let r, body = {};
+    try {
+      r = await fetch("/api/power", {method: "POST", headers: {"Content-Type": "application/json"},
+                                     body: JSON.stringify({action})});
+      body = await r.json();
+    } catch (e) { /* r stays undefined */ }
+    if (r && r.ok) {
+      panel.replaceChildren(title, note);
+      title.textContent = action === "restart" ? "Restarting…" : "Shutting down…";
+      note.textContent = action === "restart"
+        ? "The console comes back by itself in about a minute."
+        : "Wait for the screen to go dark before unplugging power.";
+      return;
+    }
+    err.textContent = (body && body.error) || "The console service didn't answer.";
+    for (const b of row.querySelectorAll("button")) b.disabled = false;
+  };
+  button("Cancel", "sd-cancel", close);
+  button("Restart", "sd-restart", () => go("restart"));
+  button("Shut down", "sd-shutdown", () => go("shutdown"));
+  panel.append(title, note, err, row);
+  box.append(panel);
+  document.body.append(box);
+}
+
+// ----------------------------------------------------------------- toolbar buttons
+
+/* Refresh: dimmed and "Refreshing…" until the new data is in, then "Updated" for a moment,
+   so it's clear the tap worked (Dan, 2026-11-11). Extra taps meanwhile do nothing. */
+function setUpToolbar() {
+  const refresh = $("refresh");
+  if (refresh) refresh.addEventListener("click", async () => {
+    if (refresh.disabled) return;
+    refresh.disabled = true;
+    refresh.textContent = "Refreshing…";
+    const started = Date.now();
+    const ok = await poll();
+    await new Promise(res => setTimeout(res, Math.max(0, 500 - (Date.now() - started))));
+    refresh.textContent = ok ? "Updated" : "No answer";
+    setTimeout(() => { refresh.textContent = "Refresh"; refresh.disabled = false; }, 1500);
+  });
+  const sleep = $("sleep");
+  if (sleep) sleep.addEventListener("click", () => setSleep(true));
+  const shutdown = $("shutdown");
+  if (shutdown) shutdown.addEventListener("click", openShutdown);
+}
+
 // ----------------------------------------------------------------- polling
 
 async function getJSON(path) {
@@ -257,10 +391,13 @@ async function poll() {
     $("service-down").hidden = true;
     renderStatusBar();
     renderBadge();
+    syncSleep();
     screen.render();
     maybeReturnHome();
+    return true;
   } catch (e) {
     $("service-down").hidden = false;
+    return false;
   }
 }
 
@@ -269,8 +406,7 @@ async function poll() {
 function startScreen(fns) {
   Object.assign(screen, fns);
   setUpClockTap();
-  const refresh = $("refresh");
-  if (refresh) refresh.addEventListener("click", () => poll());
+  setUpToolbar();
   tickClock();
   setInterval(() => {
     tickClock();

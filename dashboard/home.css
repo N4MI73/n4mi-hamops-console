@@ -176,3 +176,33 @@ button:disabled { cursor: default; }
   position: fixed; left: 16px; right: 16px; bottom: 82px; padding: 14px 20px; border-radius: 10px;
   font-size: 21px; font-weight: 600; background: var(--bad-bg); border: 2px solid var(--bad-line);
 }
+
+/* -- Sleep: black cover while the backlight is off; the first touch only wakes (2026-11-11) */
+.sleep-cover {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 40px; box-sizing: border-box; background: #000; color: #1C2630; font-size: 18px;
+}
+.sleep-cover[hidden] { display: none; }
+
+/* -- Shut down dialog (approved mockup "Shut down dialog") */
+.sd-overlay {
+  position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 8, 12, 0.82);
+}
+.sd-panel {
+  width: 820px; box-sizing: border-box; padding: 30px 32px; display: flex; flex-direction: column; gap: 14px;
+  background: var(--panel); border: 1px solid var(--panel-line); border-radius: 14px;
+}
+.sd-title { font-size: 32px; font-weight: 700; }
+.sd-note { font-size: 22px; color: var(--ink-2); }
+.sd-error { min-height: 26px; font-size: 20px; color: var(--bad-label); }
+.sd-buttons { display: flex; gap: 14px; }
+.sd-buttons button {
+  height: 72px; font-size: 24px; font-weight: 700; border-radius: 12px; color: var(--ink);
+  background: var(--ground); border: 1px solid #2E3B49;
+}
+.sd-buttons button:disabled { color: var(--dim); }
+.sd-cancel { flex: 1.6 1 0; color: #FFFFFF !important; background: #17212C !important; border: 2px solid var(--info) !important; }
+.sd-restart { flex: 1 1 0; }
+.sd-shutdown { flex: 1 1 0; color: #FFFFFF !important; background: #5A1A17 !important; border: 2px solid #E0605A !important; }
+.sd-buttons button:disabled.sd-cancel, .sd-buttons button:disabled.sd-shutdown { opacity: 0.5; }

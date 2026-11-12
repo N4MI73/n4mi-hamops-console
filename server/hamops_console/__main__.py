@@ -18,6 +18,7 @@ def main():
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     settings = settings_mod.load()
     app = create_app(settings)
+    app.extensions["hamops_display"].start()   # screen brightness by day and night
     server = settings["server"]
     logging.getLogger("hamops_console").info(
         "listening on http://%s:%s/", server["host"], server["port"])
