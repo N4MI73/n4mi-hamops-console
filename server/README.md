@@ -35,6 +35,10 @@ Every data block carries the same freshness fields (`status`: ok / stale / unava
 | `alerts.py` | Builds the ranked alert list (the one place ranking is decided) and keeps Acknowledge in `~/.local/state/hamops-console/acks.json` on the Pi, so a restart doesn't make an acknowledged warning flash again; entries older than 48 h are dropped. Also remembers NWS alerts that ended in the last 24 hours, for the Alerts page (`ended.json` in the same folder; nothing is concluded while the NWS list is out of date) |
 | `alert_classes.py` | The one place that classifies an NWS product: warning/watch/advisory/statement, and hazard to the site (site hazard, temperature, other) |
 | `system_info.py` | Readings from the Pi (temperature, load, memory, disk, power flags, network and Wi-Fi signal, clock, the RTC backup battery, GPS present); each is `null` on a machine that isn't a Pi |
+| `display.py` | Screen brightness by day and night from the settings, and Sleep (backlight off), through `/sys/class/backlight` (2026-11-11) |
+| `power.py` | Shut down and Restart from the touchscreen (`systemctl poweroff` / `reboot`; needs the polkit rule in `pi/polkit/`) (2026-11-11) |
+| `field_day.py` | The Field Day profile's timer: works out when setup starts (local midnight on the operations day) for the status-bar pill (2026-11-12) |
+| `glm.py` | Field Mode lightning from NOAA's GOES satellite lightning mapper: reads GLM files, finds flashes near the site, applies the 20/10/5-mile tiers and the 30-minute clear. **Not yet wired into the service** (step 1, 2026-11-13). Needs `python3-netcdf4` to read files |
 | `nws_text.py` | Short "what" and "hazard" lines from NWS alert text (ported from Weather Sentinel) |
 | `app.py`, `__main__.py` | The Flask app and its start-up |
 
@@ -60,4 +64,10 @@ python3 server/tests/test_weather.py
 python3 server/tests/test_forecast.py
 python3 server/tests/test_alerts.py
 python3 server/tests/test_settings_api.py
+python3 server/tests/test_nwr.py
+python3 server/tests/test_display.py
+python3 server/tests/test_field_day.py
+python3 server/tests/test_glm.py
 ```
+
+`test_glm.py` skips its file-reading tests when `python3-netcdf4` isn't installed. A real GLM file put in `server/data/glm/` (ignored by git) is read too.
