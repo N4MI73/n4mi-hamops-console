@@ -238,3 +238,7 @@ html.night-red .cell span { font-size: 22px; font-weight: 800; }
 .fd-dim { font-size: 18px; color: var(--muted); }
 .fd-pill svg { width: 20px; height: 20px; color: #C9D3DD; flex-shrink: 0; }
 .status-bar .local, .status-bar .mode-tag, .status-bar .station, .status-bar .pill { white-space: nowrap; }
+/* Field Day: the last hour before operations -- solid blue, still the info colour, so it
+   never reads as an alert (2026-11-16) */
+.fd-pill.soon { background: #1E4F86; border-color: #9CC8FF; }
+.fd-pill.soon .fd-word, .fd-pill.soon .fd-dim { color: #FFFFFF; }

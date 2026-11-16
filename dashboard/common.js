@@ -192,15 +192,22 @@ function renderFieldDayPill() {
     cls += " quiet";
     parts = [span("fd-dim", "Set ops times in Settings")];
     label = "Field Day: operations times not set";
-  } else if (now < setup) {
+  } else if (now < setup && start - now >= 864e5) {
+    // A day or more away: the date and how many days (Dan, 2026-11-16).
     cls += " quiet";
     const day = start.toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short", timeZone: "UTC"});
-    parts = [span("fd-day", day), span("fd-dim", `ops ${fdUtcHM(start)}`)];
-    label = `Field Day ${day}, operations start ${fdUtcHM(start)}`;
+    const days = Math.floor((start - now) / 864e5);
+    const away = `${days} day${days === 1 ? "" : "s"} away`;
+    parts = [span("fd-day", day), span("fd-word", away)];
+    label = `Field Day ${day}, ${away}, operations start ${fdUtcHM(start)}`;
   } else if (now < start) {
+    // Under a day: hours and minutes until operations; "Setup" once setup has begun
+    // (local midnight on the day). In the last hour the pill fills in solid blue.
     const left = fdHM(start - now);
-    parts = [span("fd-word", "Setup"), span("fd-num num", left), span("fd-dim", "until operations")];
-    label = `Field Day setup, ${left} until operations`;
+    const inSetup = now >= setup;
+    if (start - now <= 36e5) cls += " soon";
+    parts = [...(inSetup ? [span("fd-word", "Setup")] : []), span("fd-num num", left), span("fd-dim", "until operations")];
+    label = `Field Day${inSetup ? " setup" : ""}, ${left} until operations`;
   } else if (now < end) {
     const left = fdHM(end - now);
     parts = [span("fd-word", "Operations"), span("fd-num num", left), span("fd-dim", "left")];
