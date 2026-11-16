@@ -276,33 +276,7 @@ const FIELDS = {
                 get: () => display().night_start, change: v => ({display: {night_start: v}})},
   night_end: {title: "Night ends", hint: "24-hour local time, e.g. 07:00",
               get: () => display().night_end, change: v => ({display: {night_end: v}})},
-  fd_start_date: fdField("ops_start", "date", "Operations start date (UTC)"),
-  fd_start_time: fdField("ops_start", "time", "Operations start time (UTC)"),
-  fd_end_date: fdField("ops_end", "date", "Operations end date (UTC)"),
-  fd_end_time: fdField("ops_end", "time", "Operations end time (UTC)"),
 };
-
-/* Field Day times are stored as "2027-01-30T19:00Z" and typed as a date and a time.
-   (A touch date picker can replace the keyboard later.) A date with no time yet gets
-   00:00Z; a time needs its date first. */
-function fdField(key, part, title) {
-  const isDate = part === "date";
-  return {
-    title, hint: isDate ? "Year-month-day, e.g. 2027-01-30" : "24-hour UTC, e.g. 19:00",
-    get: () => { const v = fieldDay()[key]; return v ? (isDate ? v.slice(0, 10) : v.slice(11, 16)) : ""; },
-    change: v => {
-      const cur = fieldDay()[key];
-      if (v === "") return {field_day: {[key]: null}};
-      if (isDate) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return {error: "Type the date as year-month-day, e.g. 2027-01-30."};
-        return {field_day: {[key]: `${v}T${cur ? cur.slice(11, 16) : "00:00"}Z`}};
-      }
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return {error: "Type the time as hours:minutes, e.g. 19:00."};
-      if (!cur) return {error: "Set the date first."};
-      return {field_day: {[key]: `${cur.slice(0, 10)}T${v}Z`}};
-    },
-  };
-}
 
 /* Layout from the approved board; ":" and "/" are on the main layer because addresses
    and times need them. */
@@ -395,6 +369,116 @@ async function saveKeyboard() {
 }
 
 for (const name of Object.keys(FIELDS)) $("f-" + name).addEventListener("click", () => openKeyboard(name));
+
+// ----------------------------------------------------------------- date and time picker (2026-11-16)
+
+/* The touch picker for the Field Day operations times (mockup approved 2026-11-13): a
+   month calendar (Monday first) and hour/minute steppers, all in UTC, with quick buttons
+   for the usual Field Day start times and a summary with the local time and how long
+   operations last. Stored as "2027-01-30T19:00Z". */
+const dp = {key: null, y: 0, m: 0, d: 1, hh: 19, mm: 0};
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
+                "September", "October", "November", "December"];
+const fdDate = v => v ? new Date(v.replace("Z", ":00Z")) : null;
+const pad2 = n => String(n).padStart(2, "0");
+
+function dpValue() { return `${dp.y}-${pad2(dp.m + 1)}-${pad2(dp.d)}T${pad2(dp.hh)}:${pad2(dp.mm)}Z`; }
+function dpOtherKey() { return dp.key === "ops_start" ? "ops_end" : "ops_start"; }
+
+function openPicker(key) {
+  dp.key = key;
+  const fd = fieldDay();
+  let t = fdDate(fd[key]);
+  const other = fdDate(fd[dpOtherKey()]);
+  if (!t && key === "ops_end" && other) t = new Date(other.getTime() + 24 * 3600e3);   // a day after the start
+  if (!t && key === "ops_start" && other) t = new Date(other.getTime() - 24 * 3600e3);
+  if (!t) { const n = new Date(); t = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), 19, 0)); }
+  dp.y = t.getUTCFullYear(); dp.m = t.getUTCMonth(); dp.d = t.getUTCDate();
+  dp.hh = t.getUTCHours(); dp.mm = t.getUTCMinutes() - t.getUTCMinutes() % 5;
+  $("dp-title").textContent = key === "ops_start" ? "Operations start" : "Operations end";
+  $("dp-error").textContent = "";
+  renderPicker();
+  $("dp").hidden = false;
+}
+
+function dpSetDay(y, m, d) {
+  const t = new Date(Date.UTC(y, m, d));
+  dp.y = t.getUTCFullYear(); dp.m = t.getUTCMonth(); dp.d = t.getUTCDate();
+  renderPicker();
+}
+
+function renderPicker() {
+  $("dp-month").textContent = `${MONTHS[dp.m]} ${dp.y}`;
+  const first = new Date(Date.UTC(dp.y, dp.m, 1));
+  const lead = (first.getUTCDay() + 6) % 7;                     // Monday first
+  const inMonth = new Date(Date.UTC(dp.y, dp.m + 1, 0)).getUTCDate();
+  const rows = Math.ceil((lead + inMonth) / 7);
+  const other = fdDate(fieldDay()[dpOtherKey()]);
+  const now = new Date();
+  const cells = [];
+  for (let i = 0; i < rows * 7; i++) {
+    const t = new Date(Date.UTC(dp.y, dp.m, 1 - lead + i));
+    const b = document.createElement("button");
+    const y = t.getUTCFullYear(), m = t.getUTCMonth(), d = t.getUTCDate();
+    b.textContent = d;
+    const cls = [];
+    if (m !== dp.m) cls.push("out");
+    if (y === dp.y && m === dp.m && d === dp.d) cls.push("sel");
+    else if (other && y === other.getUTCFullYear() && m === other.getUTCMonth() && d === other.getUTCDate()) cls.push("end");
+    if (y === now.getUTCFullYear() && m === now.getUTCMonth() && d === now.getUTCDate()) cls.push("today");
+    b.className = cls.join(" ");
+    b.setAttribute("aria-label", t.toLocaleDateString("en-GB", {weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC"}));
+    b.addEventListener("click", () => dpSetDay(y, m, d));
+    cells.push(b);
+  }
+  $("dp-days").replaceChildren(...cells);
+  $("dp-days").style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+  $("dp-hh").textContent = pad2(dp.hh);
+  $("dp-mm").textContent = pad2(dp.mm);
+  for (const b of document.querySelectorAll("#dp-quick button")) press(b.id, Number(b.dataset.h) === dp.hh && dp.mm === 0);
+
+  const t = fdDate(dpValue());
+  const day = t.toLocaleDateString("en-GB", {weekday: "short", timeZone: "UTC"}) + " " +
+              t.toLocaleDateString("en-GB", {day: "numeric", month: "short", year: "numeric", timeZone: "UTC"});
+  $("dp-sum").textContent = `${day} · ${pad2(dp.hh)}:${pad2(dp.mm)}Z`;
+  let line = "Local: " + t.toLocaleString("en-US", {weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short"});
+  let ok = true;
+  if (other) {
+    const hours = (dp.key === "ops_end" ? t - other : other - t) / 3600e3;
+    if (hours <= 0) { line += " · ends before it starts"; ok = false; }
+    else line += ` · operations last ${Number.isInteger(hours) ? hours : hours.toFixed(1)} h`;
+  }
+  $("dp-local").textContent = line;
+  $("dp-local").classList.toggle("warn", !ok);
+  $("dp-set").disabled = !ok;
+}
+
+function dpStep(field, delta) {
+  if (field === "hh") dp.hh = (dp.hh + delta + 24) % 24;
+  else dp.mm = (dp.mm + delta + 60) % 60;
+  renderPicker();
+}
+
+$("dp-prev").addEventListener("click", () => dpSetDay(dp.y, dp.m - 1, Math.min(dp.d, 28)));
+$("dp-next").addEventListener("click", () => dpSetDay(dp.y, dp.m + 1, Math.min(dp.d, 28)));
+$("dp-hh-up").addEventListener("click", () => dpStep("hh", 1));
+$("dp-hh-down").addEventListener("click", () => dpStep("hh", -1));
+$("dp-mm-up").addEventListener("click", () => dpStep("mm", 5));
+$("dp-mm-down").addEventListener("click", () => dpStep("mm", -5));
+for (const b of document.querySelectorAll("#dp-quick button")) {
+  b.addEventListener("click", () => { dp.hh = Number(b.dataset.h); dp.mm = 0; renderPicker(); });
+}
+$("dp-cancel").addEventListener("click", () => { $("dp").hidden = true; dp.key = null; });
+$("dp-set").addEventListener("click", async () => {
+  $("dp-set").disabled = true;
+  const res = await save({field_day: {[dp.key]: dpValue()}});
+  if (res.ok) { $("dp").hidden = true; dp.key = null; }
+  else { $("dp-error").textContent = res.errors.map(plain).join(" "); $("dp-set").disabled = false; }
+});
+for (const [id, key] of [["f-fd_start_date", "ops_start"], ["f-fd_start_time", "ops_start"],
+                         ["f-fd_end_date", "ops_end"], ["f-fd_end_time", "ops_end"]]) {
+  $(id).addEventListener("click", () => openPicker(key));
+}
 $("kb-cancel").addEventListener("click", closeKeyboard);
 $("kb-save").addEventListener("click", saveKeyboard);
 $("kb-field").addEventListener("click", () => { page.text = ""; drawField(); });   // touch the box to clear it
@@ -412,7 +496,7 @@ document.addEventListener("keydown", e => {
 
 showTab(page.tab);
 startScreen({
-  render() { if (!page.editing) render(); },
+  render() { if (!page.editing && !dp.key) render(); },
   tick() { if (page.tab === "display" && !page.editing) renderDisplay(); },
   slow() { if (!page.editing) renderSources(); },
 });

@@ -173,6 +173,48 @@
   </div>
 </div>
 
+<!-- Date and time picker for the Field Day times (mockup approved 2026-11-13) -->
+<div class="kb dp" id="dp" hidden role="dialog" aria-modal="true" aria-labelledby="dp-title">
+  <div class="kb-top"><span class="kb-title" id="dp-title">Operations start</span><span class="kb-hint">UTC · tap a day, then set the time</span></div>
+  <div class="dp-body">
+    <section class="tile dp-cal" aria-label="Date">
+      <div class="dp-monthbar">
+        <button class="dp-nav" id="dp-prev" aria-label="Previous month">‹</button>
+        <span class="dp-month" id="dp-month">--</span>
+        <button class="dp-nav" id="dp-next" aria-label="Next month">›</button>
+      </div>
+      <div class="dp-grid dp-head" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      <div class="dp-grid dp-days" id="dp-days"></div>
+    </section>
+    <section class="tile dp-time" aria-label="Time">
+      <span class="st-head">TIME · UTC</span>
+      <div class="dp-clock">
+        <div class="dp-col"><button class="dp-step" id="dp-hh-up" aria-label="Hour up">▲</button><span class="dp-val num" id="dp-hh">19</span><button class="dp-step" id="dp-hh-down" aria-label="Hour down">▼</button></div>
+        <span class="dp-colon">:</span>
+        <div class="dp-col"><button class="dp-step" id="dp-mm-up" aria-label="Minutes up">▲</button><span class="dp-val num" id="dp-mm">00</span><button class="dp-step" id="dp-mm-down" aria-label="Minutes down">▼</button></div>
+        <span class="dp-colon">Z</span>
+      </div>
+      <span class="st-note dp-center">Minutes move in steps of 5.</span>
+      <div class="seg dp-quick" id="dp-quick">
+        <button id="dp-q18" data-h="18" aria-pressed="false">18:00Z</button>
+        <button id="dp-q19" data-h="19" aria-pressed="false">19:00Z</button>
+        <button id="dp-q20" data-h="20" aria-pressed="false">20:00Z</button>
+      </div>
+      <span class="st-note dp-center">Common Field Day start times</span>
+      <div class="preview dp-summary">
+        <span class="dp-sum" id="dp-sum">--</span>
+        <span class="dp-local" id="dp-local">--</span>
+      </div>
+    </section>
+  </div>
+  <span class="kb-error" id="dp-error" role="alert"></span>
+  <div class="kb-actions">
+    <button class="kb-cancel" id="dp-cancel">Cancel</button>
+    <div class="spacer"></div>
+    <button class="st-done" id="dp-set">Set</button>
+  </div>
+</div>
+
 <div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
 <script src="/static/common.js"></script>
 <script src="/static/settings.js"></script>

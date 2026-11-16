@@ -109,3 +109,29 @@
 /* -- Field Day times: label, date, time (approved board "Settings · Station & profile") */
 .fd-times { display: grid; grid-template-columns: 84px minmax(0, 1fr) 88px; gap: 8px; align-items: center; }
 .fd-times .field { font-size: 19px; padding: 0 10px; }
+
+/* -- date and time picker (mockup approved 2026-11-13), over the whole screen like the keyboard */
+.dp { gap: 10px; }
+.dp-body { flex-grow: 1; min-height: 0; display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; }
+.dp-body .tile { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; min-height: 0; }
+.dp-monthbar { display: flex; align-items: center; gap: 10px; }
+.dp-month { flex-grow: 1; text-align: center; font-size: 26px; font-weight: 700; }
+.dp-nav { width: 64px; height: 56px; font-size: 30px; font-weight: 700; color: var(--ink); background: var(--ground); border: 1px solid #2E3B49; border-radius: 10px; }
+.dp-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.dp-head span { text-align: center; font-size: 16px; font-weight: 600; letter-spacing: 0.06em; color: var(--muted); }
+.dp-days { flex-grow: 1; min-height: 0; }
+.dp-days button { min-height: 0; font-size: 22px; font-weight: 600; color: var(--ink); background: var(--ground); border: 1px solid #2E3B49; border-radius: 8px; }
+.dp-days button.out { color: var(--dim); border-color: var(--panel-line); }
+.dp-days button.sel { color: #FFFFFF; background: #17212C; border: 2px solid var(--info); }
+.dp-days button.end { border: 2px dashed #2F6FB3; }
+.dp-days button.today { box-shadow: inset 0 -3px 0 var(--muted); }
+.dp-clock { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.dp-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.dp-step { width: 110px; height: 60px; font-size: 26px; color: var(--ink); background: var(--ground); border: 1px solid #2E3B49; border-radius: 10px; }
+.dp-val { font-family: "Barlow Condensed", sans-serif; font-size: 68px; font-weight: 600; line-height: 1; }
+.dp-colon { font-family: "Barlow Condensed", sans-serif; font-size: 56px; font-weight: 600; color: var(--muted); }
+.dp-center { text-align: center; }
+.dp-quick { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dp-summary { margin-top: auto; font-size: 19px; }
+.dp-sum { font-size: 22px; font-weight: 700; color: var(--ink); }
+.dp-local.warn { color: var(--fair-label); }
