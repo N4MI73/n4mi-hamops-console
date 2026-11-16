@@ -313,7 +313,8 @@ class ForecastSource:
                 p = _props(self._fetch(f"{API}/points/{lat},{lon}", contact))
                 points = {"forecast": _text(p.get("forecast")), "hourly": _text(p.get("forecastHourly")),
                           "gridpoint": _text(p.get("forecastGridData")), "office": _text(p.get("cwa")),
-                          "zone": _last_part(p.get("forecastZone")), "county": _last_part(p.get("county"))}
+                          "zone": _last_part(p.get("forecastZone")), "county": _last_part(p.get("county")),
+                          "stations": _text(p.get("observationStations"))}
                 if not (points["forecast"] and points["hourly"] and points["gridpoint"]):
                     raise ValueError("NWS has no forecast for this location")
                 points_at = now
@@ -352,6 +353,11 @@ class ForecastSource:
         with self._lock:
             p = self._points or {}
             return {"nws_office": p.get("office"), "nws_zone": p.get("zone"), "nws_county": p.get("county")}
+
+    def stations_url(self, grid):
+        """NWS's observation-station list for `grid` (Field Mode conditions), once /points is known."""
+        with self._lock:
+            return (self._points or {}).get("stations") if self._grid == grid else None
 
     def block(self):
         now = self._clock()

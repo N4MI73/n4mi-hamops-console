@@ -112,10 +112,12 @@ def _nws_items(alerts):
             category, color = "temperature_alert", "yellow"
         else:
             category, color = ("other_warning", "blue") if kind == "warning" else ("other_notice", "blue")
-        detail = _join(a.get("hazard") or a.get("headline"), _until(a.get("expires")))
+        # "Until" is when the hazard ends (`ends`), never `expires` (when NWS will replace the
+        # message; 2026-11-16). No `ends` (Weather Sentinel, for now): no "until" shown.
+        detail = _join(a.get("hazard") or a.get("headline"), _until(a.get("ends")))
         item = _item(category, a.get("event"), detail, a.get("onset"), "weather.alerts",
-                     a.get("id") or f"nws-{a.get('event')}-{a.get('expires')}", color)
-        item["until"] = a.get("expires")    # for the Weather page's short line (2026-11-07)
+                     a.get("id") or f"nws-{a.get('event')}-{a.get('onset')}", color)
+        item["until"] = a.get("ends")       # for the Weather page's short line (2026-11-07)
         item["kind"] = kind                  # warning / watch / advisory / statement (Alerts page label)
         item["instruction"] = a.get("instruction")   # NWS's advice, for the Alerts page's Details
         out.append(item)
@@ -332,7 +334,7 @@ class EndedStore:
     An alert counts as ended when it leaves the NWS list while that list is
     current (status ok). While it is stale, unavailable or in test mode nothing
     is concluded: a missing alert there may simply not have been fetched. The
-    end time is the alert's own expiry if that has passed, otherwise the time
+    end time is the alert's own end (`ends`) if that has passed, otherwise the time
     it was seen gone (NWS ended it early). An alert that comes back (extended)
     leaves the ended list."""
 

@@ -44,10 +44,12 @@ def prop(good=(), k=1, xray="B4.3", status="ok"):
                  issued_at="2026-11-01T14:49:44Z")
 
 
-def nws(event, kind, cls, expires="2026-11-01T15:36:32Z", onset=None, id_=None, hazard="Hazard text."):
+def nws(event, kind, cls, expires="2026-11-01T15:36:32Z", onset=None, id_=None, hazard="Hazard text.",
+        ends="same"):
+    """`ends` defaults to the same time as `expires` (as for a short warning)."""
     return {"id": id_ or f"urn:test:{event}", "event": event, "kind": kind, "hazard_class": cls,
             "severity": "Severe", "headline": "Headline.", "hazard": hazard, "instruction": None,
-            "onset": onset, "expires": expires}
+            "onset": onset, "expires": expires, "ends": expires if ends == "same" else ends}
 
 
 QUIET_LIGHTNING = {"within_10mi": False, "within_5mi": False, "frequent": False, "closest_mi": None,
@@ -417,6 +419,19 @@ class EndedTest(unittest.TestCase):
         self.assertEqual((e["id"], e["title"], e["kind"], e["color"]),
                          ("urn:test:Tornado Watch", "Tornado Watch", "watch", "yellow"))
         self.assertEqual(e["ended_at"], "2026-11-01T15:12:00Z")
+
+    def test_until_is_when_the_hazard_ends_not_expires(self):
+        # NWS `expires` is when the message is due to be replaced; `ends` is the hazard's end
+        # (live sample 2026-11-16: a watch "expired" at 04:00 but ran to Friday).
+        watch = nws("Winter Storm Watch", "watch", "other", expires="2026-11-01T15:00:00Z",
+                    ends="2026-11-03T12:00:00Z")
+        item = next(i for i in self.items(watch) if i["ref"]["block"] == "weather.alerts")
+        self.assertEqual(item["until"], "2026-11-03T12:00:00Z")
+        self.assertIn("Until 12:00 UTC", item["detail"])
+        no_end = next(i for i in self.items(nws("Wind Advisory", "advisory", "site_hazard", ends=None))
+                      if i["ref"]["block"] == "weather.alerts")
+        self.assertIsNone(no_end["until"])
+        self.assertNotIn("Until", no_end["detail"])
 
     def test_expired_uses_its_expiry(self):
         sws = nws("Special Weather Statement", "statement", "site_hazard", expires="2026-11-01T15:00:00Z")

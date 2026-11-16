@@ -226,9 +226,24 @@ class Storm(unittest.TestCase):
             for field in ("acknowledged", "needs_alert", "level", "last_transition"):
                 self.assertNotIn(field, item)
 
-    def test_expired_alerts_dropped(self):
-        source, _, _ = make(storm_reply(), T_STORM + timedelta(minutes=45))
-        self.assertEqual(source.blocks()["alerts"]["items"], [])
+    def test_alerts_past_expires_kept_while_sentinel_lists_them(self):
+        # NWS `expires` is when the message is due to be replaced, not the hazard's end
+        # (2026-11-16): an alert Sentinel still lists stays, whatever its `expires`.
+        later = T_STORM + timedelta(minutes=45)
+        reply = storm_reply()
+        reply["nws"]["last_polled_at"] = freshness.iso(later - timedelta(minutes=1))
+        source, _, _ = make(reply, later)
+        items = source.blocks()["alerts"]["items"]
+        self.assertEqual(len(items), 3)
+        self.assertTrue(all(i["ends"] is None for i in items))   # Sentinel sends no `ends` yet
+
+    def test_dropped_once_ends_has_passed(self):
+        later = T_STORM + timedelta(minutes=45)
+        reply = storm_reply()
+        reply["nws"]["last_polled_at"] = freshness.iso(later - timedelta(minutes=1))
+        reply["nws"]["alerts"][0]["ends"] = freshness.iso(later - timedelta(minutes=5))
+        source, _, _ = make(reply, later)
+        self.assertEqual(len(source.blocks()["alerts"]["items"]), 2)
 
     def test_close_lightning_and_own_5_mile_hold(self):
         source, stand_in, clock = make(storm_reply(), T_STORM)
@@ -446,7 +461,9 @@ class LightningHold(unittest.TestCase):
 
 class FieldMode(unittest.TestCase):
 
-    def test_not_built_yet(self):
+    def test_no_field_grid_yet(self):
+        # Field Mode asks NWS for the Field grid (test_field_weather.py); with no grid set it
+        # can't, and the home station is never asked.
         source, stand_in, _ = make(LIVE, T_LIVE, mode="field")
         w = source.blocks()
         self.assertEqual(w["alerts"]["status"], "unavailable")

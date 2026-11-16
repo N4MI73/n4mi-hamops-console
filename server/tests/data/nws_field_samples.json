@@ -1,0 +1,227 @@
+{
+ "_about": "Trimmed from live NWS replies fetched 2026-11-16 ~13:46 UTC (alerts: whole country; stations and observation: test point 38.9,-77.0, Washington DC). Long texts shortened.",
+ "alerts": {
+  "type": "FeatureCollection",
+  "updated": "2026-11-16T13:46:22+00:00",
+  "features": [
+   {
+    "type": "Feature",
+    "geometry": null,
+    "properties": {
+     "description": "* WHAT...For the Winter Weather Advisory, snow accumulations up to 6\ninches. For the Winter Storm Watch Above 5, 000 feet, heavy snow\npossible. Total snow accumulations between 1 to 2 feet expected\nabove this elevation; accumulations around 4 feet above 8,000 feet.\nWinds could gust as high as 45 mph.\n\n* WHERE...Sierra Nevada above 5,000 feet.\n\n* WHEN...For the Winter Weather Advisory, until 4 AM P",
+     "instruction": "Slow down and use caution while traveling. The latest road conditions\nfor the state you are calling from can be obtained by calling 5 1 1.\n\nMonitor the latest forecasts for updates on this situation.\n",
+     "onset": "2026-11-18T04:00:00-08:00",
+     "expires": "2026-11-16T12:00:00-08:00",
+     "ends": "2026-11-20T04:00:00-08:00",
+     "event": "Winter Storm Watch",
+     "headline": "Winter Storm Watch issued November 16 at 3:40AM PST until November 20 at 4:00AM PST by NWS Hanford CA",
+     "id": "urn:oid:2.49.0.1.840.0.355db2e7b73da6c1192999525b4dab896e3c40cd.001.2",
+     "messageType": "Update",
+     "status": "Actual",
+     "severity": "Severe",
+     "parameters": {
+      "NWSheadline": [
+       "WINTER WEATHER ADVISORY REMAINS IN EFFECT UNTIL 4 AM PST TUESDAY... ...WINTER STORM WATCH REMAINS IN EFFECT FROM LATE TUESDAY NIGHT THROUGH LATE THURSDAY NIGHT ABOVE 5,000 FEET"
+      ],
+      "eventEndingTime": [
+       "2026-11-20T04:00:00-08:00"
+      ]
+     },
+     "sent": "2026-11-16T03:40:00-08:00"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": null,
+    "properties": {
+     "description": "* WHAT...Southeast winds 15 to 25 mph with gusts up to 40 mph.\n\n* WHERE...Prince of Wales Island.\n\n* WHEN...Until noon AKST Tuesday.\n\n* IMPACTS...Gusty winds will blow around unsecured objects. Tree\nlimbs could be blown down and a few power outages may result.\n\n* ADDITIONAL DETAILS...Off and on periods of strong wind gusts will\ncontinue through Tuesday morning as multiple fronts push into the\npanh",
+     "instruction": "Winds this strong can make travel difficult. Use extra caution.",
+     "onset": "2026-11-16T01:33:00-09:00",
+     "expires": "2026-11-16T12:15:00-09:00",
+     "ends": "2026-11-17T12:00:00-09:00",
+     "event": "Wind Advisory",
+     "headline": "Wind Advisory issued November 16 at 1:33AM AKST until November 17 at 12:00PM AKST by NWS Juneau AK",
+     "id": "urn:oid:2.49.0.1.840.0.32e8f1c7637e09dd7d0091f8da301c3b68afe105.001.1",
+     "messageType": "Alert",
+     "status": "Actual",
+     "severity": "Moderate",
+     "parameters": {
+      "NWSheadline": [
+       "WIND ADVISORY NOW IN EFFECT UNTIL NOON AKST TUESDAY"
+      ],
+      "eventEndingTime": [
+       "2026-11-17T12:00:00-09:00"
+      ]
+     },
+     "sent": "2026-11-16T01:33:00-09:00"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": null,
+    "properties": {
+     "description": "...The Flood Warning continues for the following rivers in\nWashington...\n\nSkokomish River At Potlatch affecting Mason County.\n\n* WHAT...Minor flooding is occurring and minor flooding is forecast.\n\n* WHERE...Skokomish River at Potlatch.\n\n* WHEN...Until Monday morning.\n\n* IMPACTS...At 16.5 feet, the Skokomish River will cause widespread\nflooding of pasture lands, with water flowing quickly over West",
+     "instruction": "Turn around, don't drown when encountering flooded roads. Most flood\ndeaths occur in vehicles.\n\nMotorists should not attempt to drive around barricades or drive cars\nthrough flooded areas.\n\nAdditional",
+     "onset": "2026-11-15T21:54:00-08:00",
+     "expires": "2026-11-16T06:00:00-08:00",
+     "ends": "2026-11-16T11:53:00-08:00",
+     "event": "Flood Warning",
+     "headline": "Flood Warning issued November 15 at 9:54PM PST until November 16 at 11:53AM PST by NWS Seattle WA",
+     "id": "urn:oid:2.49.0.1.840.0.1d6879f3a2d610969a217024dc92cdf8c121419e.001.1",
+     "messageType": "Update",
+     "status": "Actual",
+     "severity": "Severe",
+     "parameters": {
+      "NWSheadline": [
+       "FLOOD WARNING REMAINS IN EFFECT UNTIL MONDAY MORNING"
+      ],
+      "eventEndingTime": [
+       "2026-11-16T11:53:00-08:00"
+      ]
+     },
+     "sent": "2026-11-15T21:54:00-08:00"
+    }
+   }
+  ]
+ },
+ "stations": {
+  "features": [
+   {
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      -77.03417,
+      38.84833
+     ]
+    },
+    "properties": {
+     "stationIdentifier": "KDCA",
+     "name": "Washington/Reagan National Airport, DC",
+     "distance": {
+      "unitCode": "wmoUnit:m",
+      "value": 7477.78917104
+     },
+     "bearing": {
+      "unitCode": "wmoUnit:degree_(angle)",
+      "value": 208
+     }
+    }
+   },
+   {
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      -76.9223,
+      38.9806
+     ]
+    },
+    "properties": {
+     "stationIdentifier": "KCGS",
+     "name": "College Park Airport",
+     "distance": {
+      "unitCode": "wmoUnit:m",
+      "value": 10173.039271902
+     },
+     "bearing": {
+      "unitCode": "wmoUnit:degree_(angle)",
+      "value": 36
+     }
+    }
+   },
+   {
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      -76.85,
+      38.81667
+     ]
+    },
+    "properties": {
+     "stationIdentifier": "KADW",
+     "name": "Camp Springs / Andrews Air Force Base",
+     "distance": {
+      "unitCode": "wmoUnit:m",
+      "value": 15956.708009492
+     },
+     "bearing": {
+      "unitCode": "wmoUnit:degree_(angle)",
+      "value": 129
+     }
+    }
+   },
+   {
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      -77.18333,
+      38.71667
+     ]
+    },
+    "properties": {
+     "stationIdentifier": "KDAA",
+     "name": "Fort Belvoir",
+     "distance": {
+      "unitCode": "wmoUnit:m",
+      "value": 26872.654581935
+     },
+     "bearing": {
+      "unitCode": "wmoUnit:degree_(angle)",
+      "value": 217
+     }
+    }
+   }
+  ]
+ },
+ "observation": {
+  "properties": {
+   "stationId": "KDCA",
+   "timestamp": "2026-11-16T13:10:00+00:00",
+   "textDescription": "",
+   "temperature": {
+    "unitCode": "wmoUnit:degC",
+    "value": 6,
+    "qualityControl": "V"
+   },
+   "dewpoint": {
+    "unitCode": "wmoUnit:degC",
+    "value": 1,
+    "qualityControl": "V"
+   },
+   "windDirection": {
+    "unitCode": "wmoUnit:degree_(angle)",
+    "value": 350,
+    "qualityControl": "V"
+   },
+   "windSpeed": {
+    "unitCode": "wmoUnit:km_h-1",
+    "value": 11.124,
+    "qualityControl": "V"
+   },
+   "windGust": {
+    "unitCode": "wmoUnit:km_h-1",
+    "value": null,
+    "qualityControl": "Z"
+   },
+   "barometricPressure": {
+    "unitCode": "wmoUnit:Pa",
+    "value": 103217.12,
+    "qualityControl": "V"
+   },
+   "relativeHumidity": {
+    "unitCode": "wmoUnit:percent",
+    "value": 70.299266961976,
+    "qualityControl": "V"
+   },
+   "heatIndex": {
+    "unitCode": "wmoUnit:degC",
+    "value": null,
+    "qualityControl": "V"
+   },
+   "windChill": {
+    "unitCode": "wmoUnit:degC",
+    "value": 3.6446719529672222,
+    "qualityControl": "V"
+   }
+  }
+ }
+}

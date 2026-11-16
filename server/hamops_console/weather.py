@@ -40,6 +40,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import alert_classes, freshness, grid as grid_mod
+from .field_weather import FieldWeather
 from .forecast import ForecastSource
 from .nwr import NwrSource
 
@@ -100,26 +101,34 @@ def translate_alert(raw):
         "instruction": _text(raw.get("instruction")),
         "onset": freshness.iso(freshness.parse_time(raw.get("onset"))),
         "expires": freshness.iso(freshness.parse_time(raw.get("expires"))),
+        # When the hazard ends. Sentinel doesn't send it yet (asked 2026-11-16); until it
+        # does this is null at home and the alert shows no "until" time.
+        "ends": freshness.iso(freshness.parse_time(raw.get("ends"))),
     }
 
 
 def sort_alerts(items):
-    """Warning -> watch -> advisory -> statement, then soonest-expiring first
-    (an alert with no expiry time sorts last within its kind)."""
+    """Warning -> watch -> advisory -> statement, then the soonest-ending first (by `ends`,
+    then `expires`; an alert with neither sorts last within its kind)."""
     far = "9999-12-31T23:59:59Z"
-    return sorted(items, key=lambda a: (alert_classes.KIND_ORDER[a["kind"]], a["expires"] or far))
+    return sorted(items, key=lambda a: (alert_classes.KIND_ORDER[a["kind"]],
+                                        a.get("ends") or far, a["expires"] or far))
 
 
 def translate_alerts(nws, now):
-    """Sentinel `nws.alerts[]` -> sorted contract items, dropping any whose
-    expiry has passed (Sentinel removes them too, but kept data can age)."""
+    """Sentinel `nws.alerts[]` -> sorted contract items.
+
+    Never dropped by `expires` (2026-11-16): in NWS CAP that is when the message is due to be
+    replaced, not when the hazard ends, and NWS keeps many alerts active past it (189 of 588
+    in the live sample). Sentinel keeps an alert while NWS lists it, so its list is followed;
+    an alert is dropped by time only once its `ends` (when given) has passed."""
     items = []
     for raw in (nws or {}).get("alerts") or []:
         item = translate_alert(raw)
         if item is None:
             continue
-        expires = freshness.parse_time(item["expires"])
-        if expires is not None and expires <= now:
+        ends = freshness.parse_time(item["ends"])
+        if ends is not None and ends <= now:
             continue
         items.append(item)
     return sort_alerts(items)
@@ -200,11 +209,12 @@ class WeatherSource:
     """Keeps the last good Weather Sentinel reply and builds the weather blocks."""
 
     def __init__(self, settings, fetch=fetch_sentinel, clock=freshness.utcnow, forecast=None,
-                 lightning_state=None, nwr=None):
+                 lightning_state=None, nwr=None, field=None):
         self.settings = settings
         self.nwr = nwr or NwrSource(settings, clock=clock)
         self._state = lightning_state or LightningState()
         self.forecast = forecast or ForecastSource(settings, clock=clock)
+        self.field = field or FieldWeather(settings, self.forecast, clock=clock)
         self._fetch = fetch
         self._clock = clock
         self._lock = threading.Lock()
@@ -382,10 +392,6 @@ class WeatherSource:
         })
         return out
 
-    def _not_built(self, message):
-        out = freshness.block("NWS", None, None, 0, error=message)
-        return out
-
     def _location(self):
         mode = self.settings["mode"]
         station = self.settings["station"].get(mode, {})
@@ -405,14 +411,14 @@ class WeatherSource:
         now = self._clock()
         forecast = self.forecast.block()
         if self.settings["mode"] != "home":
-            msg = "Field Mode weather is not built yet"
-            alerts = self._not_built(msg)
-            alerts["items"] = []
-            conditions = self._not_built(msg)
-            conditions.update(EMPTY_CONDITIONS)
+            # Field Mode (2026-11-16): NWS directly; the home station is never asked.
+            alerts = self.field.alerts_block()
+            alerts["items"] = sort_alerts(alerts["items"])
             location = self._location()
-            return {"location": location, "alerts": alerts, "conditions": conditions,
-                    "lightning": None, "weather_radio": self._radio_block(location), "forecast": forecast}
+            apply_storm_alerts(forecast, alerts, now)
+            return {"location": location, "alerts": alerts,
+                    "conditions": self.field.conditions_block(), "lightning": None,
+                    "weather_radio": self._radio_block(location), "forecast": forecast}
         with self._lock:
             self._refresh_if_due(now)
             alerts = self._alerts_block(now)

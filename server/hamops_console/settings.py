@@ -51,6 +51,8 @@ DEFAULTS = {
         "conditions_stale_min": 5,
         "lightning_stale_min": 5,
         "station_obs_stale_min": 90,
+        "nws_alerts_fetch_min": 2,          # Field Mode NWS alerts (2026-11-16)
+        "station_obs_fetch_min": 15,        # Field Mode nearest-station observation
         "forecast_fetch_min": 30,
         "forecast_stale_hours": 12,
         "lightning_notify_mi": 10,

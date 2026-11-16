@@ -61,9 +61,9 @@ The rules, in order:
 |---|---|---|---|---|
 | Propagation | 5 min (`propagation_fetch_min`) | 15 min (30 until 7 November 2026) | — | Fetched only when asked, at most this often; PropMon's own `updated` is the age |
 | NWS alerts, Home | with the Sentinel fetch, 1 min (`sentinel_fetch_min`) | 10 min | 30 min (`nws_alerts_unavailable_min`) | Aged by when Sentinel last reached NWS (`last_polled_at`), not by whether Sentinel answers |
-| NWS alerts, Field | 2 min | 10 min | 30 min | Phase 3 |
+| NWS alerts, Field | 2 min (`nws_alerts_fetch_min`), in the background | 10 min | 30 min | Built 16 November 2026; aged by NWS's `updated`. Never slowed by Economy mode |
 | Local conditions, Home (Tempest) | 1 min | 5 min, or at once if Sentinel says `available: false` | — | |
-| Local conditions, Field (NWS station) | 15 min | 90 min | — | Phase 3 |
+| Local conditions, Field (NWS station) | 15 min (`station_obs_fetch_min`), in the background | 90 min (`station_obs_stale_min`) | — | Built 16 November 2026; aged by the observation's own time |
 | Lightning, Home (Tempest) | 1 min | 5 min (`lightning_stale_min`) | — | Home only |
 | Forecast (both modes) | 30 min (`forecast_fetch_min`), in the background | NWS `updateTime` older than 12 h | — | Retried 2 min after a failure |
 | System | every request | never | — | It's the Pi itself |
@@ -193,7 +193,8 @@ The **centre of the current mode's grid** locates the console for NWS. A 4-chara
       "hazard": "60 mph wind gusts and quarter size hail.",
       "instruction": "For your protection move to an interior room on the lowest floor of a building.",
       "onset": null,
-      "expires": "2026-11-01T15:36:32Z"
+      "expires": "2026-11-01T15:36:32Z",
+      "ends": "2026-11-01T15:36:32Z"
     }
   ]
 }
@@ -209,7 +210,8 @@ The **centre of the current mode's grid** locates the console for NWS. A 4-chara
 | `headline` | One line of what's happening. Home: Sentinel's `what`, else its `headline`. Field: NWS `parameters.NWSheadline`, else `headline` |
 | `hazard` | The short HAZARD line. Home: Sentinel's `hazard`. Field: the same extraction, ported from Sentinel |
 | `instruction` | NWS instruction text (can be long) |
-| `onset`, `expires` | NWS times; `onset` may be `null` |
+| `onset`, `expires` | NWS times; `onset` may be `null`. **`expires` is when NWS will replace the message, not when the hazard ends** (live sample 16 November 2026: 189 of 588 active alerts were past it) |
+| `ends` | When the hazard ends: NWS `ends`, else `parameters.eventEndingTime`; may be `null`. "Until" on the card and the Alerts page uses this, never `expires`; no `ends`, no "until". Field: from NWS. Home: `null` until Weather Sentinel sends it (asked 16 November 2026) |
 
 **Not passed through from Sentinel:** `level`, `acknowledged`, `needs_alert`, `last_transition`. Those belong to Sentinel's bedside unit. The console classifies and sorts alerts itself, and never sends anything to Sentinel.
 
@@ -220,7 +222,9 @@ The **centre of the current mode's grid** locates the console for NWS. A 4-chara
 
 The word lists live in one file in the service.
 
-**Sorting:** warning → watch → advisory → statement, then soonest expiry first (no expiry last). Alerts whose expiry has passed are dropped.
+**Sorting:** warning → watch → advisory → statement, then soonest `ends` first, then soonest `expires` (neither: last).
+
+**Which alerts are kept (changed 16 November 2026):** every alert the source lists as active. Never dropped because `expires` has passed (NWS keeps alerts active past it between reissues). Dropped by time only once `ends` has passed. Field Mode uses only `status: Actual` alerts and ignores `messageType: Cancel`.
 
 ### Conditions (`conditions`)
 
@@ -236,7 +240,7 @@ The word lists live in one file in the service.
 ```
 
 - **Home:** from Sentinel's `tempest` block; `station` is `null` (it's your own Tempest); `pressure_inhg` is station pressure.
-- **Field (Phase 3):** the nearest NWS observation station; `station` is `{"id", "name", "distance_mi"}`; `rain_rate_in_hr` usually `null`.
+- **Field (built 16 November 2026):** the nearest NWS observation station; `station` is `{"id", "name", "distance_mi"}` (NWS's own distance from the location, else worked out from the station's position); `rain_rate_in_hr` is `null`. The station list comes from the forecast's `/points` lookup (`observationStations`), checked once a day. If the nearest station's latest report is over 2 hours old or has no temperature, the next is tried (up to three); if none is good, the freshest found is shown and ages to stale. NWS units are metric and converted; a value that failed NWS quality control (`"X"`) is missing. `feels_like_f` is the wind chill when NWS gives one, else the heat index, else the temperature. `pressure_inhg` is NWS `barometricPressure`. `wind_dir` is `null` when calm.
 
 ### Lightning (`lightning`, Home only)
 
@@ -491,6 +495,7 @@ Everything the Settings screen may show and change. The service's listening addr
     "propagation_stale_min": 15, "propagation_fetch_min": 5,
     "sentinel_fetch_min": 1, "nws_alerts_stale_min": 10, "nws_alerts_unavailable_min": 30,
     "conditions_stale_min": 5, "lightning_stale_min": 5, "station_obs_stale_min": 90,
+    "nws_alerts_fetch_min": 2, "station_obs_fetch_min": 15,
     "forecast_fetch_min": 30, "forecast_stale_hours": 12,
     "lightning_notify_mi": 10, "lightning_high_mi": 5, "lightning_hold_min": 30,
     "lightning_frequent_per_min": 5, "storms_forecast_hours": 6,
@@ -546,15 +551,15 @@ The screen in the approved tabs uses only the three calls above plus `POST /api/
 | Contract block | Home Mode | Field Mode |
 |---|---|---|
 | propagation | PropMon | HamQSL + NOAA SWPC (ported PropMon logic, Phase 3) |
-| weather.alerts | Weather Sentinel `nws` | NWS `/alerts/active?point=` (Phase 3) |
-| weather.conditions | Weather Sentinel `tempest` | Nearest NWS observation station (Phase 3) |
+| weather.alerts | Weather Sentinel `nws` | NWS `/alerts/active?point=` for the Field grid's centre |
+| weather.conditions | Weather Sentinel `tempest` | Nearest NWS observation station |
 | weather.lightning | Weather Sentinel `lightning` | `null` |
 | weather.forecast | NWS forecast for the home grid | NWS forecast for the field grid |
 | weather.weather_radio | Stored NWR list, home location | Stored NWR list, field location |
 | alerts | Built by the service | Built by the service |
 | system | The Pi | The Pi |
 
-Until Phase 3, in Field Mode the alerts and conditions blocks are `unavailable` with the message "Field Mode weather is not built yet", and the home station is never asked.
+In Field Mode the home station is never asked. Field Mode alerts and conditions were built 16 November 2026; before then they were `unavailable` ("Field Mode weather is not built yet").
 
 ---
 
@@ -569,6 +574,8 @@ Until Phase 3, in Field Mode the alerts and conditions blocks are `unavailable` 
 - Priority Card rotation every 60 s unless a critical item pins it, and an NWS-alerts outage first among the data-source cards, worded as such (§6; built the same evening).
 - Economy mode in Phase 3 (§2).
 - **Settings names:** "Data source: Home / Field" (the mode in these contracts) and **"Operating profile: General HF / Field Day"**, kept separate so Field Mode isn't confused with Field Day.
+
+**Decided (16 November 2026):** alert times follow NWS CAP meaning. `ends` added to alert items; "until" and the Ended list's end time use `ends`; alerts are no longer dropped when `expires` passes, in either mode (§5). Field Mode NWS alerts (exact point) and nearest-station conditions built; settings gain `thresholds.nws_alerts_fetch_min` (2) and `thresholds.station_obs_fetch_min` (15).
 
 **Planned, not yet specified here:**
 - **Field Day operating profile.** Independent of data source and economy mode. It only adds display elements; it never changes how data is fetched, ranked or aged, so weather-alert priority and freshness are identical in both profiles. Event information is hidden in General HF. First version: a timer in a status-bar pill, never on the Priority Card, with its settings (operations start and end, entered in UTC). **Changed 5 November 2026 (evening):** the profile can be switched on days ahead; until the operations day the pill is a quiet reminder ("Field Day · Sat 30 Jan · ops 19:00Z"). Setup then begins on its own at local midnight on the operations day and counts down to the start of operations (time left to finish setup); there is no Start setup button. Then Operations (time remaining), then "Operations complete" until the profile is switched off. Times are hours:minutes. Mockups approved 5 November (four pill states, Settings in tabs). Later (Phase 2): setup readiness with manually updated categories and states Not started / In progress / Ready / Needs attention, where Ready means tested and working. A compact "X of Y ready" opens a detail panel; during operations a small indicator shows only when something isn't Ready. Candidates: UTC/local on the timer, one next-milestone reminder. Needs a mockup before building.
