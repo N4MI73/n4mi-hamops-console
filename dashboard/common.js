@@ -477,6 +477,16 @@ function setUpToolbar() {
   if (sleep) sleep.addEventListener("click", () => setSleep(true));
   const shutdown = $("shutdown");
   if (shutdown) shutdown.addEventListener("click", openShutdown);
+  setUpHelp();
+}
+
+/* Help (style approved 2026-11-13): pages with a #help panel get a live Help button;
+   the panel covers the page until Close. Pages without one keep "Help · Coming". */
+function setUpHelp() {
+  const panel = $("help"), open = $("help-open"), close = $("help-close");
+  if (!panel || !open || !close) return;
+  open.addEventListener("click", () => { panel.hidden = false; close.focus(); });
+  close.addEventListener("click", () => { panel.hidden = true; });
 }
 
 // ----------------------------------------------------------------- polling

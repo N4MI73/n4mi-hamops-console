@@ -242,3 +242,26 @@ html.night-red .cell span { font-size: 22px; font-weight: 800; }
    never reads as an alert (2026-11-16) */
 .fd-pill.soon { background: #1E4F86; border-color: #9CC8FF; }
 .fd-pill.soon .fd-word, .fd-pill.soon .fd-dim { color: #FFFFFF; }
+
+/* -- Help panel (style approved 2026-11-13): over the whole screen, three columns, Close */
+.help {
+  position: fixed; inset: 0; z-index: 40; box-sizing: border-box; padding: 16px 18px 12px;
+  display: flex; flex-direction: column; gap: 12px; background: var(--ground);
+}
+.help[hidden] { display: none; }
+.help-top { display: flex; align-items: baseline; gap: 16px; }
+.help-title { font-size: 28px; font-weight: 700; }
+.help-hint { font-size: 18px; color: var(--muted); }
+.help-cols { flex-grow: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.help-col { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; overflow: hidden; }
+.help-head { font-size: 16px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); }
+.help-head:not(:first-child) { margin-top: 6px; }
+.help-col p { margin: 0; font-size: 17px; line-height: 1.35; color: var(--ink-2); }
+.help-col b { color: var(--ink); }
+.help-col b.g { color: var(--good); } .help-col b.f { color: var(--fair-label); } .help-col b.p { color: var(--muted); }
+.help-col .tip { margin-top: auto; padding: 10px 12px; background: var(--ground); border-radius: 8px; color: var(--ink); }
+.help-actions { height: 60px; flex-shrink: 0; display: flex; }
+.help-close {
+  min-width: 220px; height: 60px; font-size: 21px; font-weight: 700; color: #FFFFFF;
+  background: #17212C; border: 2px solid var(--info); border-radius: 10px;
+}
