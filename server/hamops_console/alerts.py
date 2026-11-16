@@ -113,7 +113,7 @@ def _nws_items(alerts):
         else:
             category, color = ("other_warning", "blue") if kind == "warning" else ("other_notice", "blue")
         # "Until" is when the hazard ends (`ends`), never `expires` (when NWS will replace the
-        # message; 2026-11-16). No `ends` (Weather Sentinel, for now): no "until" shown.
+        # message; 2026-11-16). No `ends` (NWS gave none): no "until" shown.
         detail = _join(a.get("hazard") or a.get("headline"), _until(a.get("ends")))
         item = _item(category, a.get("event"), detail, a.get("onset"), "weather.alerts",
                      a.get("id") or f"nws-{a.get('event')}-{a.get('onset')}", color)

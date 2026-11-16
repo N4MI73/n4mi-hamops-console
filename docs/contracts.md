@@ -211,7 +211,7 @@ The **centre of the current mode's grid** locates the console for NWS. A 4-chara
 | `hazard` | The short HAZARD line. Home: Sentinel's `hazard`. Field: the same extraction, ported from Sentinel |
 | `instruction` | NWS instruction text (can be long) |
 | `onset`, `expires` | NWS times; `onset` may be `null`. **`expires` is when NWS will replace the message, not when the hazard ends** (live sample 16 November 2026: 189 of 588 active alerts were past it) |
-| `ends` | When the hazard ends: NWS `ends`, else `parameters.eventEndingTime`; may be `null`. "Until" on the card and the Alerts page uses this, never `expires`; no `ends`, no "until". Field: from NWS. Home: `null` until Weather Sentinel sends it (asked 16 November 2026) |
+| `ends` | When the hazard ends: NWS `ends`, else `parameters.eventEndingTime`; may be `null`. "Until" on the card and the Alerts page uses this, never `expires`; no `ends`, no "until". Field: from NWS. Home: Weather Sentinel's own `ends` (added by Sentinel 16 November 2026, `57813a4`, worked out the same way; always present, may be `null`) |
 
 **Not passed through from Sentinel:** `level`, `acknowledged`, `needs_alert`, `last_transition`. Those belong to Sentinel's bedside unit. The console classifies and sorts alerts itself, and never sends anything to Sentinel.
 

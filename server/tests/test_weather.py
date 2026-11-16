@@ -237,6 +237,15 @@ class Storm(unittest.TestCase):
         self.assertEqual(len(items), 3)
         self.assertTrue(all(i["ends"] is None for i in items))   # Sentinel sends no `ends` yet
 
+    def test_sentinel_ends_passed_through(self):
+        # Weather Sentinel sends `ends` since 57813a4 (2026-11-16).
+        reply = storm_reply()
+        reply["nws"]["alerts"][0]["ends"] = "2026-11-03T12:00:00+00:00"
+        source, _, _ = make(reply, T_STORM)
+        items = source.blocks()["alerts"]["items"]
+        self.assertEqual([i["ends"] for i in items if i["event"] == reply["nws"]["alerts"][0]["event"]],
+                         ["2026-11-03T12:00:00Z"])
+
     def test_dropped_once_ends_has_passed(self):
         later = T_STORM + timedelta(minutes=45)
         reply = storm_reply()

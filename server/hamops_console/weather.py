@@ -101,8 +101,8 @@ def translate_alert(raw):
         "instruction": _text(raw.get("instruction")),
         "onset": freshness.iso(freshness.parse_time(raw.get("onset"))),
         "expires": freshness.iso(freshness.parse_time(raw.get("expires"))),
-        # When the hazard ends. Sentinel doesn't send it yet (asked 2026-11-16); until it
-        # does this is null at home and the alert shows no "until" time.
+        # When the hazard ends: Sentinel's `ends` (added 2026-11-16, Sentinel 57813a4: NWS
+        # `ends`, else eventEndingTime, else null). Missing (an older Sentinel) reads as null.
         "ends": freshness.iso(freshness.parse_time(raw.get("ends"))),
     }
 
