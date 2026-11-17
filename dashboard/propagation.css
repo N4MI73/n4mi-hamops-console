@@ -43,3 +43,4 @@
   font-size: 22px; font-weight: 600; color: var(--dim); background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px;
 }
 .muf .soon { display: inline; font-size: 17px; }
+.band-notes { display: block; color: var(--fair-label); }

@@ -22,6 +22,8 @@ from flask import Flask, jsonify, request, send_from_directory
 
 from . import __version__, alerts as alerts_mod, field_day, freshness, power, settings as settings_mod, settings_api, system_info
 from .display import Display
+from .engine_check import EngineCheck
+from .field_propagation import FieldPropagationSource, ModePropagation
 from .propagation import PropagationSource
 from .weather import WeatherSource
 
@@ -34,8 +36,11 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
                power_runner=None):
     settings = settings or settings_mod.load()
     store = settings_api.SettingsStore(settings, settings_file)
-    propagation = propagation or PropagationSource(settings)
     weather = weather or WeatherSource(settings)
+    if propagation is None:
+        field = FieldPropagationSource(settings, forecast=getattr(weather, "forecast", None))
+        propagation = ModePropagation(settings, PropagationSource(settings), field,
+                                      EngineCheck(settings, field.model))
     acks = acks or alerts_mod.AckStore()
     ended = ended or alerts_mod.EndedStore()
     display = display or Display(settings)

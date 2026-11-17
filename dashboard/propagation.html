@@ -41,6 +41,7 @@
       <span class="best" id="best">--</span>
       <div class="band-grid" id="band-grid"></div>
       <span class="small" id="bands-note">Band ratings from PropMon</span>
+      <span class="small band-notes" id="band-notes" hidden></span>
     </section>
 
     <div class="pr-side">
@@ -70,9 +71,9 @@
   <div class="help-cols">
     <section class="tile help-col">
       <span class="help-head">BAND RATINGS</span>
-      <p><b class="g">GOOD</b> · <b class="f">FAIR</b> · <b class="p">POOR</b> for each band, right now:</p>
-      <p><b class="g">GOOD</b>: DX is workable on SSB.<br><b class="f">FAIR</b>: DX on FT8 only, or North America only on SSB.<br><b class="p">POOR</b>: North America only, or nothing, even on FT8.</p>
-      <p>The ratings come from PropMon on the home server, worked out from solar flux, the K index and the time of day <b>at the grid square named under the bands</b>. They describe how open each band is in general, not a path to one place.</p>
+      <p id="help-lead">GOOD · FAIR · POOR for each band, right now:</p>
+      <p id="help-meanings"></p>
+      <p id="help-source"></p>
       <p>The heading shows the time of day the ratings use: DAWN, DAYTIME, DUSK or NIGHT.</p>
       <p class="tip">Compare against on-air results: a few minutes on FT8 or a band scan tells you more than any rating.</p>
     </section>
@@ -82,15 +83,15 @@
       <p><b>K index</b>: geomagnetic unrest, with NOAA's storm scale: 0–3 quiet, 4 unsettled, 5 storm G1, up to 9 storm G5. Storms close the higher bands first.</p>
       <p><b>X-ray</b>: solar flares. M and X flares can black out HF on the daylight side for minutes to hours (R1–R4).</p>
       <p>Figures in <b class="f">amber</b> are high enough to hurt conditions.</p>
-      <p><b>Storm recovery</b> (amber line): after a storm PropMon holds the ratings down for a while, even once the K index has dropped.</p>
+      <p><b>Storm recovery</b> (amber line): for 12 hours after a storm the ratings are held down, even once the K index has dropped.</p>
     </section>
     <section class="tile help-col">
       <span class="help-head">WHEN DATA IS MISSING OR OLD</span>
       <p><b>STALE · N MIN</b>: no fresh ratings for 15 minutes or more. The page greys out; treat the ratings as old.</p>
-      <p><b>Band ratings unavailable</b>: PropMon can't reach its rating source just now, so the bands show "--". The solar figures may still be current.</p>
+      <p><b>Band ratings unavailable</b>: solar flux or the K index can't be had just now, so the bands show "--" rather than guesses.</p>
       <p><b>No data yet</b>: PropMon has just restarted. Ratings return within a few minutes.</p>
-      <span class="help-head">AWAY FROM HOME</span>
-      <p>On home sources the ratings describe the home grid square, wherever the console is. Field Mode will rate the bands for the operating site.</p>
+      <span class="help-head">HOME AND FIELD</span>
+      <p>Home Mode shows PropMon's ratings for the home grid square, wherever the console is. Field Mode rates the Field grid square itself, and the Field Day profile switches to North America reach.</p>
     </section>
   </div>
   <div class="help-actions"><button class="help-close" id="help-close">Close</button></div>

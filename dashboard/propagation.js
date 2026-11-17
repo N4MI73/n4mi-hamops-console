@@ -38,9 +38,20 @@ function thresholds() {
    only day/night). */
 const PERIOD_WORDS = {dawn: "DAWN", day: "DAYTIME", dusk: "DUSK", night: "NIGHT"};
 
-/* PropMon rates for the home station's location (its own sun times), so the footnote
-   names the home grid square, 4 characters (the 6-character grid stays private). */
+/* PropMon rates for the home station's location (its own sun times), so at home the footnote
+   names the home grid square, 4 characters (the 6-character grid stays private). In Field
+   Mode the console rates the Field grid itself and says which (`rated_for`) and on which
+   scale (DX, or Field Day: North America reach). 2026-11-17. */
 function ratingsNote(p) {
+  const field = p && p.source !== "PropMon" && p.scale;
+  if (field) {
+    if (p.ratings_available === false)
+      return "HamQSL isn't sending solar flux and K just now, so the bands aren't rated.";
+    const where = p.rated_for ? ` for ${p.rated_for}` : "";
+    return p.scale === "field_day"
+      ? `Field Day ratings${where}: North America reach, from solar flux, K index and time of day`
+      : `Ratings${where} from solar flux, K index and time of day`;
+  }
   const st = (((state.data.settings || {}).station) || {}).home || {};
   const square = typeof st.grid === "string" && /^[A-R]{2}\d{2}/i.test(st.grid)
     ? st.grid.slice(0, 2).toUpperCase() + st.grid.slice(2, 4) : null;
@@ -48,6 +59,40 @@ function ratingsNote(p) {
     return "PropMon can't reach HamQSL just now, so it isn't rating bands. Figures from NOAA.";
   return square ? `Ratings for ${square} from solar flux, K index and time of day`
                 : "Band ratings from PropMon: solar flux, K index and time of day";
+}
+
+/* Lines under the bands: a band's own note (6m on the Field Day scale), and the field
+   engine's version check when a newer model exists. */
+function bandNotes(p) {
+  const lines = [];
+  if (p && p.status !== "unavailable" && p.note) lines.push(`${p.note}.`);
+  for (const b of (p && p.status !== "unavailable" && p.bands) || []) if (b.note) lines.push(`${b.band}: ${b.note}.`);
+  const e = p && p.engine;
+  if (e && e.status === "out_of_date" && e.message) lines.push(`${e.message}.`);
+  return lines;
+}
+
+/* Help follows the scale on screen: the Field Day meanings come from the model file. */
+function renderHelp(p) {
+  const fd = p && p.scale === "field_day" && p.meanings;
+  $("help-meanings").innerHTML = "";
+  const add = (cls, word, text) => {
+    const b = el("b", cls, word);
+    $("help-meanings").append(b, document.createTextNode(": " + text), el("br"));
+  };
+  if (fd) {
+    $("help-lead").textContent = "Field Day scale: North America reach on the Field Day bands (no WARC), right now:";
+    add("g", "GOOD", fd.good); add("f", "FAIR", fd.fair); add("p", "POOR", fd.poor);
+    $("help-meanings").append(document.createTextNode("6m always reads POOR (openings can't be forecast). Not yet checked against June (ARRL Field Day)."));
+  } else {
+    $("help-lead").textContent = "GOOD · FAIR · POOR for each band, right now:";
+    add("g", "GOOD", "DX is workable on SSB.");
+    add("f", "FAIR", "DX on FT8 only, or North America only on SSB. DX is often workable on FT8 even when SSB is quiet or North America only.");
+    add("p", "POOR", "North America only, or nothing, even on FT8.");
+  }
+  $("help-source").textContent = p && p.source && p.source !== "PropMon"
+    ? "In Field Mode this Pi rates the bands itself with PropMon's model: solar flux and K from HamQSL, NOAA's storm history, and the time of day at the grid square named under the bands. A guide to where to listen first."
+    : "The ratings come from PropMon on the home server, worked out from solar flux, the K index and the time of day at the grid square named under the bands. They describe how open each band is in general, not a path to one place.";
 }
 
 function list(names) {
@@ -72,7 +117,12 @@ function renderBands() {
   const bands = show ? (p.bands || []) : [];
   const period = show && PERIOD_WORDS[p.period];
   $("bands-title").textContent = "BAND CONDITIONS · NOW" + (period ? " · " + period : "");
-  $("bands-note").textContent = ratingsNote(show ? p : null);
+  $("bands-note").textContent = show || !p || p.source === "PropMon" ? ratingsNote(show ? p : null)
+    : "Field Mode: bands rated on this Pi from HamQSL and NOAA";
+  const notes = bandNotes(p);
+  $("band-notes").hidden = !notes.length;
+  $("band-notes").textContent = notes.join(" ");
+  renderHelp(p);
   if (!bands.length) {
     $("best").textContent = "Band conditions not available";
     grid.replaceChildren(el("div", "band-msg", (p && p.message) || "No data from PropMon yet"));
@@ -122,7 +172,8 @@ function renderSolar() {
     [el("dt", "", name), el("dd", disturbed ? "fair" : "", value)]));
   const rec = $("recovery");
   rec.hidden = !(v.recovery_active === true && v.recovery_ends);
-  rec.textContent = rec.hidden ? "" : `Storm recovery: PropMon holds ratings down until ${clockPair(v.recovery_ends)}.`;
+  const held = p && p.source === "PropMon" ? "PropMon holds ratings down" : "ratings held down";
+  rec.textContent = rec.hidden ? "" : `Storm recovery: ${held} until ${clockPair(v.recovery_ends)}.`;
 }
 
 function renderAll() {

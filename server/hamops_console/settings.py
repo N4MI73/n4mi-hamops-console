@@ -41,6 +41,9 @@ DEFAULTS = {
     "sources": {
         "propmon_url": "",
         "sentinel_url": "",
+        # Ham Shack Automation's published field engine model, read only to compare
+        # versions ("Field engine out of date"); never downloaded into use (2026-11-17).
+        "field_engine_url": "https://raw.githubusercontent.com/N4MI73/n4mi-shack-server/main/field-engine/rating_model.json",
     },
     "thresholds": {
         "propagation_stale_min": 15,
@@ -53,6 +56,7 @@ DEFAULTS = {
         "station_obs_stale_min": 90,
         "nws_alerts_fetch_min": 2,          # Field Mode NWS alerts (2026-11-16)
         "station_obs_fetch_min": 15,        # Field Mode nearest-station observation
+        "field_propagation_fetch_min": 10,  # Field Mode HamQSL + NOAA Kp (2026-11-17)
         "forecast_fetch_min": 30,
         "forecast_stale_hours": 12,
         "lightning_notify_mi": 10,

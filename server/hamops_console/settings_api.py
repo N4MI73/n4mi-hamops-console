@@ -41,7 +41,7 @@ THRESHOLD_RANGES = {
     "sentinel_fetch_min": (1, 10), "nws_alerts_stale_min": (2, 120),
     "nws_alerts_unavailable_min": (5, 240), "conditions_stale_min": (1, 120),
     "lightning_stale_min": (1, 60), "station_obs_stale_min": (15, 480),
-    "nws_alerts_fetch_min": (1, 10), "station_obs_fetch_min": (5, 60),
+    "nws_alerts_fetch_min": (1, 10), "station_obs_fetch_min": (5, 60), "field_propagation_fetch_min": (5, 60),
     "forecast_fetch_min": (10, 240), "forecast_stale_hours": (1, 48),
     "lightning_notify_mi": (1, 30), "lightning_high_mi": (1, 30), "lightning_hold_min": (5, 120),
     "lightning_frequent_per_min": (1, 60), "storms_forecast_hours": (1, 12),
@@ -171,7 +171,7 @@ def check(changes, current):
         else:
             for field, value in sources.items():
                 where = f"sources.{field}"
-                if field not in ("propmon_url", "sentinel_url"):
+                if field not in ("propmon_url", "sentinel_url", "field_engine_url"):
                     errors.append(f"{where} isn't a source setting")
                 elif not isinstance(value, str) or (value and not _url_ok(value)):
                     errors.append(f"{where}: an address such as http://host:8076, or empty")

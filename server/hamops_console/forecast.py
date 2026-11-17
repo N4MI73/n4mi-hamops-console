@@ -314,7 +314,8 @@ class ForecastSource:
                 points = {"forecast": _text(p.get("forecast")), "hourly": _text(p.get("forecastHourly")),
                           "gridpoint": _text(p.get("forecastGridData")), "office": _text(p.get("cwa")),
                           "zone": _last_part(p.get("forecastZone")), "county": _last_part(p.get("county")),
-                          "stations": _text(p.get("observationStations"))}
+                          "stations": _text(p.get("observationStations")),
+                          "time_zone": _text(p.get("timeZone"))}
                 if not (points["forecast"] and points["hourly"] and points["gridpoint"]):
                     raise ValueError("NWS has no forecast for this location")
                 points_at = now
@@ -358,6 +359,11 @@ class ForecastSource:
         """NWS's observation-station list for `grid` (Field Mode conditions), once /points is known."""
         with self._lock:
             return (self._points or {}).get("stations") if self._grid == grid else None
+
+    def time_zone(self, grid):
+        """The location's IANA time zone from /points (e.g. America/New_York), once known."""
+        with self._lock:
+            return (self._points or {}).get("time_zone") if self._grid == grid else None
 
     def block(self):
         now = self._clock()

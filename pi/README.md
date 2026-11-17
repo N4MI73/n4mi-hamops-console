@@ -31,7 +31,7 @@ sudo raspi-config nonint do_boot_behaviour B2    # console autologin on the Pi's
 The service runs from a copy of this repository on the Pi at `/home/hamops/hamops-console` (cloned with git; updated with `git pull`). Settings live in `~/.config/hamops-console/settings.json`, never in the repository.
 
 ```
-sudo apt install -y python3-flask git
+sudo apt install -y python3-flask python3-astral git
 git clone https://github.com/N4MI73/n4mi-hamops-console.git ~/hamops-console
 sudo cp ~/hamops-console/pi/systemd/hamops-console.service /etc/systemd/system/
 sudo systemctl daemon-reload

@@ -97,6 +97,9 @@ def translate(raw):
         "period": period if period in PERIODS else None,
         "recovery_active": recovery if isinstance(recovery, bool) else None,
         "recovery_ends": freshness.iso(ends),
+        # PropMon's rating model (v2 field added 2026-11-17), compared with the field
+        # engine's copy at home ("Field engine out of date").
+        "model_version": raw.get("model_version") if isinstance(raw.get("model_version"), str) else None,
     }
 
 

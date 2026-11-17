@@ -59,7 +59,8 @@ The rules, in order:
 
 | Block | Fetched every | Stale after | Unavailable after | Notes |
 |---|---|---|---|---|
-| Propagation | 5 min (`propagation_fetch_min`) | 15 min (30 until 7 November 2026) | — | Fetched only when asked, at most this often; PropMon's own `updated` is the age |
+| Propagation, Home | 5 min (`propagation_fetch_min`) | 15 min (30 until 7 November 2026) | — | Fetched only when asked, at most this often; PropMon's own `updated` is the age |
+| Propagation, Field | 10 min (`field_propagation_fetch_min`), in the background | 15 min (`propagation_stale_min`) | — | Built 17 November 2026; aged from the last good HamQSL reply; retried 2 min after a failure; bands re-rated on every request |
 | NWS alerts, Home | with the Sentinel fetch, 1 min (`sentinel_fetch_min`) | 10 min | 30 min (`nws_alerts_unavailable_min`) | Aged by when Sentinel last reached NWS (`last_polled_at`), not by whether Sentinel answers |
 | NWS alerts, Field | 2 min (`nws_alerts_fetch_min`), in the background | 10 min | 30 min | Built 16 November 2026; aged by NWS's `updated`. Never slowed by Economy mode |
 | Local conditions, Home (Tempest) | 1 min | 5 min, or at once if Sentinel says `available: false` | — | |
@@ -124,7 +125,8 @@ Errors from `POST`/`PUT` endpoints are JSON: `{"error": "..."}` or, for settings
 ```
 
 - **Home:** from PropMon (`solar_wind` renamed to show its unit; `status` → `rating`, since `status` means freshness here).
-- **Field (Phase 3):** the service computes the same fields from HamQSL and NOAA SWPC by porting PropMon's logic, so the dashboard can't tell the difference.
+- **Field (built 17 November 2026):** the service rates the bands itself with **Ham Shack Automation's field engine** (`server/hamops_console/fieldengine/`, a copy from `n4mi-shack-server` `field-engine/` at commit `4872101`: model `2026-11-17-v3`, Field Day scale `2026-11-17-fd1`; needs `python3-astral`), the same model as PropMon, for the centre of the Field grid and the site's time zone (from NWS `/points`, else the Pi's). Inputs: HamQSL `solarxml.php` (`solarflux`, `kindex`, `aindex`, `sunspots`, `xray`, `solarwind`) and NOAA's planetary K JSON for the 12-hour storm-recovery hold (if NOAA can't be reached no hold is applied and `note` says so). Missing SFI or K: `ratings_available: false` and no bands, never ten POORs. Extra fields in Field Mode: `scale` (`"dx"`, or `"field_day"` while the Field Day profile is on), `scale_version`, `model_version`, `rated_for` (the 4-character Field square), `meanings` (`{good, fair, poor}` one-liners for the scale, read by the Help panel; Field Day's come from the model file), `note`, and per band an optional `note` (6m on the Field Day scale: always `poor`, "Sporadic E openings can't be forecast from SFI/K - check the band"). `period` is 20m's time of day (the 40m–6m bucket, as PropMon's). `source` is `"HamQSL + NOAA SWPC"`. **The Field Day scale** rates North America reach (within 4,000 km) on 160, 80, 40, 20, 15, 10 and 6m; tuned on November data at EM83, suited to Winter Field Day, not yet validated for ARRL Field Day (June). In Home Mode the Field Day profile doesn't change PropMon's ratings.
+- **`engine`, both modes (17 November 2026):** whether the field engine's copy of the model is current — `{"status": "current" | "out_of_date" | "unknown", "model_version", "field_day_version", "propmon_model_version", "published_model_version", "published_field_day_version", "checked_at", "message"}`. Compared with PropMon v2's `model_version` (read at home) and the published model file (setting `sources.field_engine_url`, read about daily, retried hourly). It only reports: **the console never downloads or switches models** (Dan, 16 November 2026); new models arrive by handover, committed with their tests. The Propagation page shows `message` in amber when out of date. Home Mode also reads PropMon v2's `model_version`.
 - `rating` is `good`, `fair`, `poor`, or `null`. Poor shows grey, not red.
 - **Band order:** good, then fair, then poor, then unknown; within each, lowest frequency first. The service sends `bands` already in this order.
 - PropMon's `alerts[]` and `tower_status` are not used.
@@ -538,7 +540,7 @@ NWS is tested against a small JSON endpoint (its home page is HTML). `message` e
 
 The screen in the approved tabs uses only the three calls above plus `POST /api/weather-radio/refresh`. Every change is sent at once as its own `PUT`; there is no separate Save step. The service's reasons for refusing a change are shown where it was made (in the keyboard, or on the footer line), and nothing is saved.
 
-- **Station & profile:** callsign and grid for the current mode, typed on the on-screen keyboard. Data source Field is shown but disabled ("Phase 3"), GPS as the grid source "Phase 4", and the Field Day profile and economy mode "Coming"/"Phase 3". A 4-character grid shows the coarse-grid warning.
+- **Station & profile:** callsign and grid for the current mode, typed on the on-screen keyboard. Data source Field is live since 17 November 2026 (it was disabled, "Phase 3", until Field propagation existed), GPS as the grid source "Phase 4", and the Field Day profile and economy mode "Coming"/"Phase 3". A 4-character grid shows the coarse-grid warning.
 - **Display:** the main clock (working), day and night brightness, night style and night times. Brightness and night style are saved now; the screen follows them once brightness control is built (with Sleep and Shut down).
 - **Data sources:** the PropMon and Weather Sentinel addresses, Test connections, and the weather radio list's age with Update now (202 starts it; 409 means one is already running).
 - **Wi-Fi:** shows the current network and signal; joining networks comes with Field Mode.
@@ -550,7 +552,7 @@ The screen in the approved tabs uses only the three calls above plus `POST /api/
 
 | Contract block | Home Mode | Field Mode |
 |---|---|---|
-| propagation | PropMon | HamQSL + NOAA SWPC (ported PropMon logic, Phase 3) |
+| propagation | PropMon | HamQSL + NOAA SWPC, rated on the Pi by Ham Shack Automation's field engine (17 Nov 2026) |
 | weather.alerts | Weather Sentinel `nws` | NWS `/alerts/active?point=` for the Field grid's centre |
 | weather.conditions | Weather Sentinel `tempest` | Nearest NWS observation station |
 | weather.lightning | Weather Sentinel `lightning` | `null` |
@@ -576,6 +578,8 @@ In Field Mode the home station is never asked. Field Mode alerts and conditions 
 - **Settings names:** "Data source: Home / Field" (the mode in these contracts) and **"Operating profile: General HF / Field Day"**, kept separate so Field Mode isn't confused with Field Day.
 
 **Decided (16 November 2026):** alert times follow NWS CAP meaning. `ends` added to alert items; "until" and the Ended list's end time use `ends`; alerts are no longer dropped when `expires` passes, in either mode (§5). Field Mode NWS alerts (exact point) and nearest-station conditions built; settings gain `thresholds.nws_alerts_fetch_min` (2) and `thresholds.station_obs_fetch_min` (15).
+
+**Decided (17 November 2026):** Field Mode propagation built on Ham Shack Automation's field engine (§4), with its DX scale and, under the Field Day profile, its Field Day scale (North America reach; Dan accepted Ham Shack Automation's offer the same day, replacing the "FAIR or better = open for North America" stopgap of 16 November). The engine copy carries no home coordinates: its EM83 example and test cases use the centre of EM83 (Dan). Version check `engine` in the propagation block (§4). Settings gain `thresholds.field_propagation_fetch_min` (10) and `sources.field_engine_url`; Data source Field is enabled. Help gains Ham Shack Automation's FAIR line and the Field Day meanings.
 
 **Planned, not yet specified here:**
 - **Field Day operating profile.** Independent of data source and economy mode. It only adds display elements; it never changes how data is fetched, ranked or aged, so weather-alert priority and freshness are identical in both profiles. Event information is hidden in General HF. First version: a timer in a status-bar pill, never on the Priority Card, with its settings (operations start and end, entered in UTC). **Changed 5 November 2026 (evening):** the profile can be switched on days ahead; until the operations day the pill is a quiet reminder ("Field Day · Sat 30 Jan · ops 19:00Z"). Setup then begins on its own at local midnight on the operations day and counts down to the start of operations (time left to finish setup); there is no Start setup button. Then Operations (time remaining), then "Operations complete" until the profile is switched off. Times are hours:minutes. Mockups approved 5 November (four pill states, Settings in tabs). Later (Phase 2): setup readiness with manually updated categories and states Not started / In progress / Ready / Needs attention, where Ready means tested and working. A compact "X of Y ready" opens a detail panel; during operations a small indicator shows only when something isn't Ready. Candidates: UTC/local on the timer, one next-milestone reminder. Needs a mockup before building.

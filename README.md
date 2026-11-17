@@ -50,7 +50,7 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 
 - Raspberry Pi OS Lite (64-bit, Debian 13 "trixie")
 - labwc (Wayland compositor) + Chromium in kiosk mode
-- Console service: Python 3 + Flask (from Raspberry Pi OS packages), run as a systemd service
+- Console service: Python 3 + Flask and astral (from Raspberry Pi OS packages), run as a systemd service
 
 ## Configuration
 
@@ -58,7 +58,7 @@ The console reads its settings from `~/.config/hamops-console/settings.json` on 
 
 ## Running the tests
 
-No network or Pi needed. the service, weather, forecast and alert tests need Flask (`sudo apt install python3-flask`, or `pip install flask` elsewhere):
+No network or Pi needed. The service, weather, forecast and alert tests need Flask (`sudo apt install python3-flask`, or `pip install flask` elsewhere); the Field Mode propagation tests need astral (`sudo apt install python3-astral`, or `pip install astral==3.2`). Every test file runs with `for t in server/tests/test_*.py; do python3 $t; done`:
 
 ```
 python3 server/tests/test_nws_text.py
@@ -72,6 +72,8 @@ python3 server/tests/test_settings_api.py
 ## Credits
 
 `server/hamops_console/nws_text.py` is ported from N4MI's [Weather Sentinel](https://github.com/N4MI73/n4mi-weather-sentinel), so Field Mode alerts read the same as the alerts Weather Sentinel provides at home.
+
+`server/hamops_console/fieldengine/` is Ham Shack Automation's PropMon field engine from [n4mi-shack-server](https://github.com/N4MI73/n4mi-shack-server) (`field-engine/`, commit `4872101`), so Field Mode rates bands with the same model as PropMon at home; its README lists what was changed in this copy.
 
 Data sources: [NOAA/NWS](https://www.weather.gov) (alerts, forecasts, observations, NOAA Weather Radio listings), [NOAA SWPC](https://www.swpc.noaa.gov), [HamQSL](https://www.hamqsl.com), [KC2G](https://prop.kc2g.com).
 

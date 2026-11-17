@@ -120,9 +120,10 @@ function renderFieldDay() {
 function renderProfile() {
   renderFieldDay();
   press("src-home", mode() === "home");
+  press("src-field", mode() === "field");
   $("src-note").textContent = mode() === "home"
-    ? "Where the data comes from. Home: PropMon and Weather Sentinel on the home network. Field (the internet, through this Pi) comes with Phase 3."
-    : "Where the data comes from. Field: the internet, through this Pi.";
+    ? "Where the data comes from. Home: PropMon and Weather Sentinel on the home network."
+    : "Where the data comes from. Field: NWS, HamQSL and NOAA over the internet; this Pi rates the bands. Set the Field grid below.";
   $("station-head").textContent = `STATION · ${mode().toUpperCase()}`;
   $("f-callsign").textContent = station().callsign || "--";
   $("f-grid").textContent = station().grid || "--";
@@ -209,6 +210,7 @@ function render() {
 // ----------------------------------------------------------------- choices
 
 $("src-home").addEventListener("click", () => { if (mode() !== "home") saveOrSay({mode: "home"}); });
+$("src-field").addEventListener("click", () => { if (mode() !== "field") saveOrSay({mode: "field"}); });
 $("op-gen").addEventListener("click", () => { if (settings().profile === "field_day") saveOrSay({profile: "general_hf"}); });
 $("op-fd").addEventListener("click", () => { if (settings().profile !== "field_day") saveOrSay({profile: "field_day"}); });
 $("mc-utc").addEventListener("click", () => { if (mainClock() !== "utc") saveOrSay({display: {main_clock: "utc"}}); });
