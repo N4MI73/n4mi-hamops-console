@@ -161,9 +161,19 @@ function renderSources(s) {
   const svc = s.service || {};
   const up = svc.started_at ? (Date.now() - new Date(svc.started_at)) / 1000 : null;
   const service = {status: "ok", age_sec: 0};
-  const rows = [
+  /* Field Mode (2026-11-17): the home servers aren't asked; the rows name what is. */
+  const st = (w.conditions || {}).station;
+  const stationWords = st && st.id ? ` · ${st.id}${typeof st.distance_mi === "number" ? ` ${Math.round(st.distance_mi)} mi` : ""}` : "";
+  const homeRows = [
     sourceRow("PropMon", "home server · propagation", p),
     sourceRow("Weather Sentinel", "home server · Tempest + NWS alerts", worstBlock([w.alerts, w.conditions, w.lightning])),
+  ];
+  const fieldRows = [
+    sourceRow("HamQSL + NOAA SWPC", "internet · bands rated on this Pi", p),
+    sourceRow("NWS alerts and station", `internet · field grid${stationWords}`, worstBlock([w.alerts, w.conditions])),
+  ];
+  const rows = [
+    ...(mode === "field" ? fieldRows : homeRows),
     sourceRow("Console service", "this Pi · page and data relay", service,
               up === null ? "running" : `running · ${uptimeWords(up)}`),
     sourceRow("NWS forecast", `internet · ${mode} grid`, w.forecast),
