@@ -141,12 +141,18 @@
   </div>
 
   <!-- Wi-Fi -->
-  <div class="st-body st-two" id="tab-wifi" hidden>
-    <section class="tile" aria-label="Wi-Fi">
-      <span class="st-head">WI-FI</span>
-      <div class="st-row"><span class="st-label">Network</span><span class="st-value" id="wifi-now">--</span></div>
-      <span class="st-note big">Joining networks from the touchscreen comes with Field Mode (Phase 3).</span>
-      <span class="st-note">Until then, to use another phone's hotspot, set that hotspot's name and password to match the saved hotspot, or add the network at the Pi with a USB keyboard (nmtui).</span>
+  <!-- Wi-Fi (mockups approved 2026-11-05; built 2026-11-17) -->
+  <div class="st-body wf-two" id="tab-wifi" hidden>
+    <section class="tile" aria-label="Saved networks">
+      <span class="st-head">SAVED NETWORKS · FIRST CHOICE AT THE TOP</span>
+      <span class="st-note warn" id="wf-blocked" hidden></span>
+      <div class="wf-list" id="wf-saved"></div>
+      <span class="st-note st-foot">When several are in range, the console joins the highest one. Passwords stay in the Pi's network settings; they are never shown again.</span>
+    </section>
+    <section class="tile" aria-label="Nearby networks">
+      <div class="wf-head"><span class="st-head" id="wf-scanned">NEARBY</span><button class="wf-scan" id="wf-scan">Scan again</button></div>
+      <div class="wf-list" id="wf-nearby"></div>
+      <span class="st-note st-foot">Not supported: hidden networks, logins that ask for a username, and hotel-style sign-in pages.</span>
     </section>
   </div>
 
@@ -162,7 +168,7 @@
 
 <!-- On-screen keyboard (approved 2026-11-05 with the Wi-Fi join screen) -->
 <div class="kb" id="kb" hidden role="dialog" aria-modal="true" aria-labelledby="kb-title">
-  <div class="kb-top"><span class="kb-title" id="kb-title">--</span><span class="kb-hint" id="kb-hint"></span></div>
+  <div class="kb-top"><span class="kb-title" id="kb-title">--</span><span class="kb-hint" id="kb-hint"></span><div class="spacer"></div><button class="kb-show" id="kb-show" aria-pressed="false" hidden>Show</button></div>
   <div class="kb-field" id="kb-field" aria-live="polite"><span id="kb-text"></span><span class="caret"></span></div>
   <span class="kb-error" id="kb-error" role="alert"></span>
   <div class="kb-keys" id="kb-keys" role="group" aria-label="On-screen keyboard"></div>

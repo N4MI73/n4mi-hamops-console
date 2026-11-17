@@ -26,6 +26,7 @@ from .engine_check import EngineCheck
 from .field_propagation import FieldPropagationSource, ModePropagation
 from .propagation import PropagationSource
 from .weather import WeatherSource
+from .wifi import WiFi
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_DIR = REPO_ROOT / "dashboard"
@@ -33,7 +34,7 @@ DASHBOARD_DIR = REPO_ROOT / "dashboard"
 
 def create_app(settings=None, propagation=None, weather=None, acks=None, ended=None, dashboard_dir=DASHBOARD_DIR,
                settings_file=None, test_connections=settings_api.test_connections, display=None,
-               power_runner=None):
+               power_runner=None, wifi=None):
     settings = settings or settings_mod.load()
     store = settings_api.SettingsStore(settings, settings_file)
     weather = weather or WeatherSource(settings)
@@ -44,6 +45,7 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
     acks = acks or alerts_mod.AckStore()
     ended = ended or alerts_mod.EndedStore()
     display = display or Display(settings)
+    wifi = wifi or WiFi()
     started_at = freshness.utcnow()
     app = Flask(__name__, static_folder=None)
     app.extensions["hamops_display"] = display     # __main__ starts its day/night check
@@ -207,6 +209,51 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
         if not ok:
             return jsonify({"error": message}), 503
         return jsonify({"started": action})
+
+    # ---------------------------------------------------------------- Wi-Fi (2026-11-17)
+    def nocache(body, code=200):
+        response = jsonify(body)
+        response.headers["Cache-Control"] = "no-store"
+        return response, code
+
+    @app.get("/api/wifi")
+    def api_wifi():
+        """Saved networks (first choice first), nearby networks from the last scan, whether
+        this Pi allows changes (the polkit rule), and the last join's result."""
+        return nocache({"wifi": wifi.block()})
+
+    @app.post("/api/wifi/scan")
+    def api_wifi_scan():
+        started, error = wifi.scan()
+        return nocache({"started": True}, 202) if started else nocache({"error": error}, 409)
+
+    @app.post("/api/wifi/join")
+    def api_wifi_join():
+        """{"ssid": "...", "password": "..."} (no password for an open or saved network).
+        The password goes only to NetworkManager; it is never logged or sent back."""
+        body = request.get_json(silent=True)
+        body = body if isinstance(body, dict) else {}
+        started, error = wifi.join(body.get("ssid"), body.get("password"))
+        return nocache({"started": True}, 202) if started else nocache({"error": error}, 400)
+
+    @app.post("/api/wifi/order")
+    def api_wifi_order():
+        """{"ids": [...every saved network's id, first choice first]}"""
+        body = request.get_json(silent=True)
+        error = wifi.reorder(body.get("ids") if isinstance(body, dict) else None)
+        return nocache({"wifi": wifi.block()}) if error is None else nocache({"error": error}, 400)
+
+    @app.post("/api/wifi/forget")
+    def api_wifi_forget():
+        """{"id": "<saved network's id>"}"""
+        body = request.get_json(silent=True)
+        error = wifi.forget(body.get("id") if isinstance(body, dict) else None)
+        return nocache({"wifi": wifi.block()}) if error is None else nocache({"error": error}, 400)
+
+    @app.post("/api/wifi/dismiss")
+    def api_wifi_dismiss():
+        wifi.clear_job()
+        return nocache({"ok": True})
 
     @app.get("/healthz")
     def healthz():

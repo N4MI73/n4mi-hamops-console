@@ -15,7 +15,13 @@ const page = {
   results: null,        // last Test connections reply
   testing: false,
   msgTimer: 0,
+  secret: false,        // the keyboard is taking a Wi-Fi password: shown as dots unless Show
+  show: false,
 };
+
+/* Wi-Fi tab state (2026-11-17). The password lives only in page.text while the keyboard is
+   open, is sent once to /api/wifi/join and is then cleared. */
+const wf = {data: null, timer: 0, armed: null, armTimer: 0, joinSsid: null, lastJob: null};
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -85,6 +91,8 @@ function showTab(tab) {
     if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   }
   for (const t of ["profile", "display", "sources", "wifi"]) $("tab-" + t).hidden = t !== page.tab;
+  clearInterval(wf.timer);
+  if (page.tab === "wifi") { loadWifi(); wf.timer = setInterval(loadWifi, 4000); }
 }
 for (const b of document.querySelectorAll(".st-tabs button")) b.addEventListener("click", () => showTab(b.dataset.tab));
 
@@ -194,17 +202,166 @@ function renderSources() {
   $("radio-update").disabled = !!(r && r.updating);
 }
 
-function renderWifi() {
-  const n = ((state.data.system || {}).system || {}).network || {};
-  const sig = typeof n.wifi_signal_pct === "number" ? ` · signal ${n.wifi_signal_pct} %` : "";
-  $("wifi-now").textContent = n.connection ? `${n.connection}${sig}` : "Not connected";
+// ----------------------------------------------------------------- Wi-Fi tab (2026-11-17)
+
+async function wifiCall(path, body) {
+  try {
+    const r = await fetch(path, {method: body === undefined ? "GET" : "POST",
+                                 headers: {"Content-Type": "application/json"},
+                                 body: body === undefined ? undefined : JSON.stringify(body)});
+    const j = await r.json();
+    return r.ok ? {ok: true, body: j} : {ok: false, error: (j && j.error) || `Not done (${r.status}).`};
+  } catch (e) {
+    return {ok: false, error: "Couldn't reach the console service."};
+  }
 }
+
+async function loadWifi() {
+  const r = await wifiCall("/api/wifi");
+  if (!r.ok) return;
+  wf.data = r.body.wifi;
+  const job = wf.data.job;
+  const key = job ? job.ssid + job.state : null;
+  if (job && key !== wf.lastJob) {
+    if (job.state === "joining") say(`Joining ${job.ssid}…`);
+    else if (job.state === "joined") { say(`Joined ${job.ssid}.`, "ok"); wifiCall("/api/wifi/dismiss", {}); }
+    else { say(`Couldn't join ${job.ssid}: ${job.message || "no reason given"}`, "bad"); wifiCall("/api/wifi/dismiss", {}); }
+  }
+  wf.lastJob = key;
+  if (page.tab === "wifi") renderWifi();
+}
+
+const strength = s => s >= 75 ? "strong" : s >= 50 ? "good" : s >= 25 ? "fair" : "weak";
+
+function bars(n) {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", "28"); svg.setAttribute("height", "24"); svg.setAttribute("viewBox", "0 0 28 24");
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", `Signal ${n} of 4`);
+  [[1, 17, 6], [8, 12, 11], [15, 7, 16], [22, 2, 21]].forEach(([x, y, h], i) => {
+    const r = document.createElementNS(NS, "rect");
+    for (const [k, v] of [["x", x], ["y", y], ["width", 5], ["height", h], ["rx", 1]]) r.setAttribute(k, v);
+    r.setAttribute("fill", i < n ? "#E6EBF0" : "#2E3B49");
+    svg.append(r);
+  });
+  return svg;
+}
+
+function arrow(down, label, onClick, disabled) {
+  const b = el("button", "arrow");
+  b.setAttribute("aria-label", label);
+  b.disabled = disabled;
+  b.innerHTML = `<svg aria-hidden="true" width="22" height="22" viewBox="0 0 20 20"><path d="${down ? "M4 7.5l6 6 6-6" : "M4 12.5l6-6 6 6"}" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function renderWifi() {
+  const d = wf.data;
+  if (!d) return;
+  const can = d.available && d.can_change;
+  const blocked = $("wf-blocked");
+  blocked.hidden = can;
+  blocked.textContent = d.message || "";
+  const ids = d.saved.map(s => s.id);
+  $("wf-saved").replaceChildren(...(d.saved.length ? d.saved.map((s, i) => {
+    const row = el("div", "wf-row" + (s.active ? " on" : ""));
+    const text = el("div", "wf-text");
+    const sub = el("span", "wf-sub" + (s.active ? " on" : ""));
+    sub.append(el("span", "wf-dot"), document.createTextNode(
+      s.active ? `Connected · ${strength(s.signal)} signal` : s.in_range ? `In range · ${strength(s.signal)} signal` : "Not in range"));
+    text.append(el("span", "wf-name", s.ssid), sub);
+    const move = (from, to) => {
+      const order = ids.slice();
+      order.splice(to, 0, order.splice(from, 1)[0]);
+      wifiAct("/api/wifi/order", {ids: order});
+    };
+    const forget = el("button", "forget" + (wf.armed === s.id ? " armed" : ""), wf.armed === s.id ? "Forget?" : "Forget");
+    forget.disabled = !can;
+    forget.addEventListener("click", () => {
+      if (wf.armed === s.id) { wf.armed = null; wifiAct("/api/wifi/forget", {id: s.id}); return; }
+      wf.armed = s.id;                    // two taps: the first only arms it, for 4 seconds
+      clearTimeout(wf.armTimer);
+      wf.armTimer = setTimeout(() => { wf.armed = null; renderWifi(); }, 4000);
+      renderWifi();
+    });
+    row.append(el("span", "wf-rank", String(s.rank)), text,
+               arrow(false, `Move ${s.ssid} up`, () => move(i, i - 1), !can || i === 0),
+               arrow(true, `Move ${s.ssid} down`, () => move(i, i + 1), !can || i === ids.length - 1),
+               forget);
+    return row;
+  }) : [el("span", "wf-empty", d.available ? "No saved Wi-Fi networks." : (d.message || "Wi-Fi not available."))]));
+
+  const age = d.scanned_at ? Math.max(0, Math.round((Date.now() - Date.parse(d.scanned_at)) / 1000)) : null;
+  $("wf-scanned").textContent = d.scanning ? "NEARBY · SCANNING…"
+    : age === null ? "NEARBY · FROM THE LAST SCAN" : age < 120 ? `NEARBY · SCANNED ${age} S AGO` : `NEARBY · SCANNED ${Math.round(age / 60)} MIN AGO`;
+  $("wf-scan").disabled = !can || d.scanning;
+  const joining = d.job && d.job.state === "joining";
+  $("wf-nearby").replaceChildren(...(d.nearby.length ? d.nearby.map(n => {
+    const row = el("div", "wf-row");
+    const text = el("div", "wf-text");
+    const saved = d.saved.find(s => s.id === n.saved_id);
+    const sec = n.enterprise ? "Username login · not supported" : n.open ? "Open · no password" : "Password";
+    text.append(el("span", "wf-name", n.ssid), el("span", "wf-sub", saved ? `${sec} · saved` : sec));
+    const connected = saved && saved.active;
+    const b = el("button", "join", connected ? "Joined" : "Join");
+    b.disabled = !can || n.enterprise || connected || joining;
+    b.addEventListener("click", () => {
+      if (saved || n.open) wifiAct("/api/wifi/join", {ssid: n.ssid});
+      else openPassword(n.ssid, d.saved.length + 1);
+    });
+    row.append(bars(n.bars), text, b);
+    return row;
+  }) : [el("span", "wf-empty", "No networks heard yet. Tap Scan again.")]));
+}
+
+async function wifiAct(path, body) {
+  const r = await wifiCall(path, body);
+  if (!r.ok) say(plain(r.error), "bad");
+  if (r.ok && r.body.wifi) { wf.data = r.body.wifi; renderWifi(); }
+  else loadWifi();
+}
+
+function openPassword(ssid, choice) {
+  page.editing = "__wifi";
+  wf.joinSsid = ssid;
+  page.text = "";
+  page.caps = false;
+  page.layer = "lower";
+  page.secret = true;
+  page.show = false;
+  $("kb-title").textContent = `Join “${ssid}”`;
+  $("kb-hint").textContent = `Saved as choice ${choice} · move it up in the list afterwards`;
+  $("kb-error").textContent = "";
+  $("kb-save").textContent = "Join network";
+  $("kb-save").disabled = false;
+  $("kb-show").hidden = false;
+  press("kb-show", false);
+  drawKeys();
+  drawField();
+  $("kb").hidden = false;
+}
+
+async function joinWithPassword() {
+  const pw = page.text;
+  if (pw.length < 8 || pw.length > 63) { $("kb-error").textContent = "A Wi-Fi password is 8 to 63 characters."; return; }
+  $("kb-save").disabled = true;
+  const r = await wifiCall("/api/wifi/join", {ssid: wf.joinSsid, password: pw});
+  $("kb-save").disabled = false;
+  if (!r.ok) { $("kb-error").textContent = plain(r.error); return; }
+  closeKeyboard();
+  say(`Joining ${wf.joinSsid}…`);
+  loadWifi();
+}
+
+$("wf-scan").addEventListener("click", () => wifiAct("/api/wifi/scan", {}));
+$("kb-show").addEventListener("click", () => { page.show = !page.show; press("kb-show", page.show); drawField(); });
 
 function render() {
   renderProfile();
   renderDisplay();
   renderSources();
-  renderWifi();
+  if (page.tab === "wifi") renderWifi();
 }
 
 // ----------------------------------------------------------------- choices
@@ -331,7 +488,7 @@ function drawKeys() {
   const rows = page.layer === "symbols" ? LAYERS.symbols : LAYERS.lower;
   $("kb-keys").replaceChildren(...rows.map(keyRow));
 }
-function drawField() { $("kb-text").textContent = page.text; }
+function drawField() { $("kb-text").textContent = page.secret && !page.show ? "•".repeat(page.text.length) : page.text; }
 
 function type(ch) {
   if (page.text.length >= 120) return;
@@ -355,9 +512,18 @@ function openKeyboard(name) {
   drawField();
   $("kb").hidden = false;
 }
-function closeKeyboard() { page.editing = null; $("kb").hidden = true; }
+function closeKeyboard() {
+  page.editing = null;
+  if (page.secret) page.text = "";      // the password is never kept
+  page.secret = false;
+  page.show = false;
+  $("kb-show").hidden = true;
+  $("kb-save").textContent = "Save";
+  $("kb").hidden = true;
+}
 
 async function saveKeyboard() {
+  if (page.editing === "__wifi") return joinWithPassword();
   const f = FIELDS[page.editing];
   if (!f) return;
   $("kb-save").disabled = true;

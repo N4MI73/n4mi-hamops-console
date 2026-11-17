@@ -1,0 +1,17 @@
+// Ham Ops Console: lets the hamops user save, join and scan Wi-Fi networks, so the
+// touchscreen's Settings Wi-Fi tab works. The console service runs as hamops without a
+// login session, and NetworkManager's own rules only cover users sitting at a session, so
+// polkit would ask for a password, which a touchscreen can't give (checked on the Pi
+// 2026-11-05 and 2026-11-17: "auth" for these three). Only these three actions; turning the
+// Wi-Fi radio on or off stays blocked.
+// Installed to /etc/polkit-1/rules.d/50-hamops-wifi.rules; see pi/README.md.
+polkit.addRule(function (action, subject) {
+    var allowed = [
+        "org.freedesktop.NetworkManager.settings.modify.system",
+        "org.freedesktop.NetworkManager.network-control",
+        "org.freedesktop.NetworkManager.wifi.scan"
+    ];
+    if (subject.user == "hamops" && allowed.indexOf(action.id) >= 0) {
+        return polkit.Result.YES;
+    }
+});
