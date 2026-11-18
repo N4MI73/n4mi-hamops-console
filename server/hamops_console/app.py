@@ -188,6 +188,13 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
         return envelope(system=system_info.block(__version__, started_at), display=display.block(),
                         field_day=field_day.block(settings))
 
+    @app.get("/api/gps")
+    def api_gps():
+        """GPS details for the panel opened from the GPS light (2026-11-18)."""
+        response = jsonify({"generated_at": freshness.iso(freshness.utcnow()), "gps": gps.details()})
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.post("/api/display")
     def api_display():
         """Sleep (backlight off) or wake: {"action": "sleep" | "wake"}. Answers with the

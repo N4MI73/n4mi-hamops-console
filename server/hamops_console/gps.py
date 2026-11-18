@@ -18,6 +18,11 @@ and keeps:
   fix, so GPS time is only compared and reported.
 
 The GPS grid is used for the Field station only (see location.py).
+
+2026-11-18 (later): `details()` for the GPS details panel (GET /api/gps): the
+satellites heard (direction, height, signal, used or not), position, altitude,
+accuracy, how long the first fix took and the receiver as gpsd reports it.
+Position is kept in memory only, never saved.
 """
 
 import json
@@ -86,6 +91,13 @@ class GpsSource:
         self._time_offset = None        # GPS minus Pi clock, seconds, with a fix
         self._gps_time = None
         self._fix_since_start = False   # a saved grid isn't confirmed until a fix this run
+        self._sats = []                 # [{prn, az, el, ss, used}] from the last SKY with a list
+        self._hdop = None
+        self._lat = self._lon = self._alt = self._acc = None
+        self._release = None            # gpsd version
+        self._device = {}               # path, driver, bps
+        self._search_since = None       # when the receiver started reporting (this time)
+        self._first_fix_sec = None
         self._grid, self._grid_at = self._load()
 
     # -- saved grid
@@ -116,7 +128,16 @@ class GpsSource:
             return
         cls = msg.get("class")
         with self._lock:
-            if cls == "TPV":
+            if cls in ("TPV", "SKY") and (self._last_report is None
+                                          or (now - self._last_report).total_seconds() > REPORT_GONE_SEC):
+                self._search_since, self._first_fix_sec = now, None     # (re)started reporting
+            if cls == "VERSION":
+                self._release = msg.get("release") if isinstance(msg.get("release"), str) else None
+            elif cls == "DEVICE" and isinstance(msg.get("path"), str):
+                if msg.get("activated"):
+                    self._device = {k: msg.get(k) for k in ("path", "driver", "bps")
+                                    if isinstance(msg.get(k), (str, int)) and not isinstance(msg.get(k), bool)}
+            elif cls == "TPV":
                 self._last_report = now
                 mode = msg.get("mode") if isinstance(msg.get("mode"), int) else 0
                 self._mode = mode
@@ -131,6 +152,18 @@ class GpsSource:
                         self._candidate = None
                     self._last_fix = now
                     self._fix_since_start = True
+                    if self._first_fix_sec is None and self._search_since is not None:
+                        self._first_fix_sec = int((now - self._search_since).total_seconds())
+                    self._lat, self._lon = lat, lon
+                    alt = _num(msg.get("altMSL"))
+                    if alt is None:
+                        alt = _num(msg.get("alt"))
+                    self._alt = alt if mode >= 3 else None      # a 2D fix has no altitude
+                    eph = _num(msg.get("eph"))
+                    if eph is None:
+                        ex, ey = _num(msg.get("epx")), _num(msg.get("epy"))
+                        eph = max(ex, ey) if ex is not None and ey is not None else None
+                    self._acc = eph
                     self._position_grid = grid
                     self._consider(grid, now)
                     t = _parse_time(msg.get("time") or "")
@@ -141,7 +174,15 @@ class GpsSource:
             elif cls == "SKY":
                 self._last_report = now
                 seen, used = _num(msg.get("nSat")), _num(msg.get("uSat"))
+                self._hdop = _num(msg.get("hdop"))
                 sats = msg.get("satellites")
+                if isinstance(sats, list):
+                    self._sats = [
+                        {"prn": s.get("PRN"), "az": _num(s.get("az")), "el": _num(s.get("el")),
+                         "ss": _num(s.get("ss")), "used": s.get("used") is True}
+                        for s in sats if isinstance(s, dict) and _num(s.get("PRN")) is not None][:64]
+                elif seen == 0:
+                    self._sats = []
                 if isinstance(sats, list) and (seen is None or used is None):
                     seen = len(sats)
                     used = sum(1 for s in sats if isinstance(s, dict) and s.get("used"))
@@ -213,6 +254,28 @@ class GpsSource:
                 "time_check": time_check,
                 "message": message,
             }
+
+    def details(self, now=None):
+        """The block plus what the GPS details panel shows (GET /api/gps)."""
+        now = now or freshness.utcnow()
+        out = self.block(now)
+        with self._lock:
+            fixed = out["fix"] is not None
+            reporting = out["reporting"]
+            out.update({
+                "satellites": [dict(s) for s in self._sats] if reporting else [],
+                "hdop": self._hdop if fixed else None,
+                "lat": round(self._lat, 5) if fixed and self._lat is not None else None,
+                "lon": round(self._lon, 5) if fixed and self._lon is not None else None,
+                "alt_m": round(self._alt, 1) if fixed and self._alt is not None else None,
+                "accuracy_m": round(self._acc, 1) if fixed and self._acc is not None else None,
+                "gps_time": freshness.iso(self._gps_time) if fixed and self._gps_time else None,
+                "searching_since": freshness.iso(self._search_since) if reporting else None,
+                "first_fix_sec": self._first_fix_sec if reporting else None,
+                "gpsd_release": self._release,
+                "device": dict(self._device) if self._device else None,
+            })
+        return out
 
     # -- background reader
     def start(self):

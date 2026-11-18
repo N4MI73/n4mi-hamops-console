@@ -265,3 +265,38 @@ html.night-red .cell span { font-size: 22px; font-weight: 800; }
   min-width: 220px; height: 60px; font-size: 21px; font-weight: 700; color: #FFFFFF;
   background: #17212C; border: 2px solid var(--info); border-radius: 10px;
 }
+
+/* -- GPS details panel (approved mockup, 2026-11-18); opened from the GPS light or the System page */
+.pill.tappable { cursor: pointer; }
+.g-back { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.g-panel { width: 1200px; height: 640px; background: var(--panel); border: 2px solid var(--panel-line); border-radius: 12px;
+  padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; }
+.g-panel.good { border-color: var(--good-line); } .g-panel.fair { border-color: var(--fair-line); }
+.g-head { display: flex; align-items: center; gap: 14px; }
+.g-head h2 { margin: 0; font-size: 30px; font-weight: 700; }
+.g-chip { font-size: 17px; font-weight: 700; letter-spacing: 0.06em; padding: 4px 10px; border-radius: 6px; }
+.g-chip.good { background: var(--good-bg); color: var(--good-label); border: 1px solid var(--good-line); }
+.g-chip.fair { background: var(--fair-bg); color: var(--fair-label); border: 1px solid var(--fair-line); }
+.g-close { margin-left: auto; height: 60px; width: 150px; font-size: 22px; font-weight: 600; color: var(--ink);
+  background: var(--well); border: 1px solid var(--panel-line); border-radius: 10px; }
+.g-body { display: flex; gap: 26px; flex: 1; min-height: 0; }
+.g-sky { width: 400px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.g-legend { font-size: 16px; color: var(--muted); display: flex; gap: 16px; }
+.g-legend i { display: inline-block; width: 13px; height: 13px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.g-legend i.used { background: var(--good); } .g-legend i.heard { border: 2px solid var(--grey); }
+.g-note { font-size: 15px; color: var(--grey); }
+.g-right { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.g-facts { display: grid; grid-template-columns: 170px 1fr; row-gap: 7px; font-size: 20px; }
+.g-facts > span:nth-child(odd) { color: var(--muted); }
+.g-facts > span:nth-child(even) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-good { color: var(--good); } .g-fair { color: var(--fair-label); }
+.g-sub { font-size: 15px; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin-top: 4px; }
+.g-bars { display: flex; gap: 8px; height: 150px; align-items: stretch; }
+.g-bar { display: flex; flex-direction: column; align-items: center; width: 38px; gap: 3px; }
+.g-well { flex: 1; width: 26px; background: var(--well); border: 1px solid var(--panel-line); border-radius: 4px;
+  display: flex; align-items: flex-end; overflow: hidden; }
+.g-well div { width: 100%; }
+.g-snr { font-size: 15px; color: var(--ink-2); } .g-prn { font-size: 16px; color: var(--muted); }
+.g-empty { font-size: 20px; color: var(--fair-label); align-self: center; }
+.g-tip { font-size: 17px; color: var(--ink-2); line-height: 1.35; background: var(--well); border: 1px solid var(--panel-line);
+  border-radius: 8px; padding: 10px 14px; }

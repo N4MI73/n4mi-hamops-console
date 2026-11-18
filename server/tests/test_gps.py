@@ -289,6 +289,77 @@ class EffectiveGrid(unittest.TestCase):
         self.assertEqual(json.loads(open(path).read())["station"]["field"]["grid_source"], "gps")
 
 
+class Details(unittest.TestCase):
+    """What the GPS details panel shows (GET /api/gps)."""
+
+    def full(self, src, t):
+        src.handle({"class": "VERSION", "release": "3.25"}, now=t)
+        src.handle({"class": "DEVICE", "path": "/dev/ttyUSB0", "driver": "SiRF", "bps": 4800,
+                    "activated": "2026-11-18T19:51:14.052Z"}, now=t)
+        src.handle({"class": "SKY", "hdop": 0.9, "satellites": [
+            {"PRN": 12, "az": 200, "el": 70, "ss": 44, "used": True},
+            {"PRN": 31, "az": 110, "el": 5, "ss": 0, "used": False},
+            {"PRN": "x"}]}, now=t)
+        msg = tpv(IN_LV, when=t)
+        msg.update(altMSL=85.04, alt=118.0, eph=4.2)
+        src.handle(msg, now=t)
+
+    def test_with_fix(self):
+        src = source()
+        src._connected = True
+        t = feed(src, None, T0, 14 * 60 - 5, step=5, mode=1)   # searching, a report every 5 s
+        t = T0 + timedelta(minutes=14)
+        self.full(src, t)
+        d = src.details(now=t)
+        self.assertEqual([x["prn"] for x in d["satellites"]], [12, 31])
+        self.assertEqual(d["satellites"][0], {"prn": 12, "az": 200, "el": 70, "ss": 44, "used": True})
+        self.assertEqual((d["lat"], d["lon"], d["alt_m"], d["accuracy_m"], d["hdop"]),
+                         (38.89, -77.04, 85.0, 4.2, 0.9))
+        self.assertEqual(d["first_fix_sec"], 14 * 60)
+        self.assertEqual(d["device"], {"path": "/dev/ttyUSB0", "driver": "SiRF", "bps": 4800})
+        self.assertEqual(d["gpsd_release"], "3.25")
+        self.assertIsNotNone(d["gps_time"])
+
+    def test_without_fix_hides_position(self):
+        src = source()
+        self.full(src, T0)
+        later = T0 + timedelta(seconds=30)
+        src.handle(tpv(None, mode=1, when=later), now=later)
+        d = src.details(now=later)
+        for k in ("lat", "lon", "alt_m", "accuracy_m", "hdop", "gps_time"):
+            self.assertIsNone(d[k], k)
+        self.assertEqual(len(d["satellites"]), 2)          # still heard
+        self.assertEqual(src.details(now=T0 + timedelta(minutes=5))["satellites"], [])   # stopped reporting
+
+    def test_2d_fix_has_no_altitude(self):
+        src = source()
+        msg = tpv(IN_LV, mode=2)
+        msg["altMSL"] = 85.0
+        src.handle(msg, now=T0)
+        self.assertIsNone(src.details(now=T0)["alt_m"])
+
+    def test_position_never_saved(self):
+        path = os.path.join(tempfile.mkdtemp(), "gps.json")
+        src = source(state_file=path)
+        feed(src, IN_LV, T0, 121)
+        self.assertNotIn("38.", open(path).read())
+
+    def test_endpoint(self):
+        from hamops_console import app as app_mod
+        src = source()
+        self.full(src, gps_mod.freshness.utcnow())
+        settings = settings_mod.load("/nonexistent/settings.json")
+        try:
+            client = app_mod.create_app(settings, weather=object(), propagation=object(), gps=src).test_client()
+            r = client.get("/api/gps")
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.get_json()["gps"]["satellites"][0]["prn"], 12)
+            self.assertIn("no-store", r.headers["Cache-Control"])
+            r.close()
+        finally:
+            location.use_gps(None)
+
+
 class Reader(unittest.TestCase):
     """The loop against a stand-in gpsd on a local socket."""
 

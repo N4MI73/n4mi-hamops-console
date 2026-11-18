@@ -457,6 +457,170 @@ function openShutdown() {
   document.body.append(box);
 }
 
+// ----------------------------------------------------------------- GPS details (2026-11-18)
+
+/* Approved mockup "GPS details" (Dan, 2026-11-18): opened by tapping the GPS light on any
+   screen, or the GPS row on the System page. Sky plot (centre overhead, outer ring the
+   horizon; green = used in the fix, grey ring = heard, not used), the details, and one
+   signal bar per satellite. Reads GET /api/gps every 2 s while open. */
+let gpsBox = null, gpsTimer = null;
+
+function gEl(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined && text !== null) e.textContent = text;
+  return e;
+}
+
+function gpsSky(sats) {
+  const ns = "http://www.w3.org/2000/svg", cx = 190, cy = 190, R = 170;
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("width", "380"); svg.setAttribute("height", "380"); svg.setAttribute("viewBox", "0 0 380 380");
+  const add = (tag, attrs, text) => {
+    const e = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (text !== undefined) e.textContent = text;
+    svg.append(e);
+  };
+  for (const elv of [0, 30, 60]) {
+    const r = R * (90 - elv) / 90;
+    add("circle", {cx, cy, r, fill: "none", stroke: "#2A3542", "stroke-width": elv ? 1 : 2});
+    if (elv) add("text", {x: cx + 4, y: cy - r + 16, fill: "#5C6B7A", "font-size": 14}, `${elv}°`);
+  }
+  add("line", {x1: cx, y1: cy - R, x2: cx, y2: cy + R, stroke: "#1E2731"});
+  add("line", {x1: cx - R, y1: cy, x2: cx + R, y2: cy, stroke: "#1E2731"});
+  for (const [t, x, y] of [["N", cx, cy - R - 4], ["S", cx, cy + R + 18], ["E", cx + R + 12, cy + 6], ["W", cx - R - 14, cy + 6]])
+    add("text", {x, y, fill: "#A3B0BE", "font-size": 17, "font-weight": 700, "text-anchor": "middle"}, t);
+  for (const s of sats) {
+    if (typeof s.az !== "number" || typeof s.el !== "number" || s.el < 0) continue;
+    const r = R * (90 - Math.min(s.el, 90)) / 90, a = s.az * Math.PI / 180;
+    const x = Math.round(cx + r * Math.sin(a)), y = Math.round(cy - r * Math.cos(a));
+    add("circle", {cx: x, cy: y, r: 15, fill: s.used ? "#3FCF6E" : "none", stroke: s.used ? "#3FCF6E" : "#7D8B99", "stroke-width": 2});
+    add("text", {x, y: y + 5, fill: s.used ? "#06090D" : "#C9D3DD", "font-size": 14, "font-weight": 700, "text-anchor": "middle"}, String(s.prn));
+  }
+  return svg;
+}
+
+function gpsMinutes(sec) {
+  if (typeof sec !== "number") return null;
+  return sec < 90 ? `${Math.round(sec)} s` : `${Math.round(sec / 60)} min`;
+}
+
+function renderGpsPanel(g, loc) {
+  const panel = gpsBox.querySelector(".g-panel");
+  const fixed = !!g.fix;
+  panel.className = "g-panel " + (fixed ? "good" : "fair");
+  const chip = gpsBox.querySelector(".g-chip");
+  chip.className = "g-chip " + (fixed ? "good" : "fair");
+  chip.textContent = fixed ? `${g.fix.toUpperCase()} FIX` : (g.present ? "NO FIX" : "NOT CONNECTED");
+  gpsBox.querySelector(".g-sky-plot").replaceChildren(gpsSky(g.satellites || []));
+
+  const sats = g.satellites || [];
+  const used = sats.filter(s => s.used).length;
+  const heard = sats.length || g.satellites_seen || 0;
+  const span = (text, cls) => gEl("span", cls || "", text);
+  const rows = [];
+  rows.push(["Satellites", heard
+    ? [span(`${used || g.satellites_used || 0} used`, used ? "g-good" : ""), span(` of ${heard} heard`)]
+    : [span(g.present ? "none heard" : "--", "g-fair")]]);
+  const from = {gps: "from GPS", gps_unconfirmed: "from GPS · not yet confirmed",
+                gps_waiting: "typed (waiting for GPS)", manual: "typed"}[loc.grid_from] || "";
+  rows.push(["Grid in use", [span(`${dash(loc.grid)} · ${loc.label || ""}${from ? " · " + from : ""}`,
+                                  loc.grid_from === "gps_unconfirmed" || loc.grid_from === "gps_waiting" ? "g-fair" : "")]]);
+  rows.push(["Position", [span(typeof g.lat === "number"
+    ? `${Math.abs(g.lat).toFixed(4)}° ${g.lat >= 0 ? "N" : "S"} · ${Math.abs(g.lon).toFixed(4)}° ${g.lon >= 0 ? "E" : "W"}` : "--")]]);
+  rows.push(["Altitude", [span(typeof g.alt_m === "number" ? `${Math.round(g.alt_m)} m (${Math.round(g.alt_m * 3.28084)} ft)` : "--")]]);
+  const acc = [typeof g.accuracy_m === "number" ? `about ±${Math.round(g.accuracy_m)} m` : null,
+               typeof g.hdop === "number" ? `HDOP ${g.hdop.toFixed(1)}` : null].filter(Boolean).join(" · ");
+  rows.push(["Accuracy", [span(acc || "--")]]);
+  let timeSpans;
+  if (g.time_check === "agrees") timeSpans = [span(`${utcClock(new Date(g.gps_time))} · `), span("agrees with the Pi clock", "g-good")];
+  else if (g.time_check === "differs") timeSpans = [span(`differs from the Pi clock by ${Math.abs(Math.round(g.time_offset_sec))} s`, "g-fair")];
+  else if (g.time_check === "gps_wrong") timeSpans = [span("GPS date wrong · ignored (the Pi clock is used)", "g-fair")];
+  else timeSpans = [span(fixed ? "--" : "not checked without a fix", fixed ? "" : "muted")];
+  rows.push(["GPS time", timeSpans]);
+  if (fixed || g.last_fix_at) {
+    const ago = g.last_fix_at ? gpsMinutes((Date.now() - Date.parse(g.last_fix_at)) / 1000) : null;
+    const first = gpsMinutes(g.first_fix_sec);
+    rows.push(["Last fix", [span([ago ? `${ago} ago` : "--", first ? `first fix ${first} after start` : null].filter(Boolean).join(" · "))]]);
+  } else if (g.searching_since) {
+    rows.push(["Searching", [span(`${gpsMinutes((Date.now() - Date.parse(g.searching_since)) / 1000)} since the receiver started`)]]);
+  }
+  const d = g.device || {};
+  const recv = [d.driver, d.path, d.bps ? `${d.bps} baud` : null, g.gpsd_release ? `gpsd ${g.gpsd_release}` : null].filter(Boolean).join(" · ");
+  rows.push(["Receiver", [span(recv || g.message || "--", recv ? "" : "g-fair")]]);
+  gpsBox.querySelector(".g-facts").replaceChildren(...rows.flatMap(([k, v]) => [gEl("span", "", k), gEl("span", "", "")].map((e, i) => {
+    if (i === 1) e.append(...v);
+    return e;
+  })));
+
+  const bars = gpsBox.querySelector(".g-bars");
+  if (!sats.length) bars.replaceChildren(gEl("div", "g-empty", g.present ? "No satellites heard" : "No GPS receiver reporting"));
+  else bars.replaceChildren(...[...sats].sort((a, b) => (b.ss || 0) - (a.ss || 0)).slice(0, 18).map(s => {
+    const bar = gEl("div", "g-bar");
+    const well = gEl("div", "g-well"), fill = gEl("div");
+    fill.style.height = `${Math.max(4, Math.min(100, (s.ss || 0) * 2))}%`;
+    fill.style.background = s.used ? "var(--good)" : "var(--grey)";
+    well.append(fill);
+    bar.append(gEl("span", "g-snr num", s.ss ? String(Math.round(s.ss)) : "–"), well, gEl("span", "g-prn num", String(s.prn)));
+    return bar;
+  }));
+  const tip = gpsBox.querySelector(".g-tip");
+  tip.hidden = fixed || heard > 0 && g.present;
+  tip.textContent = !g.present
+    ? "No GPS receiver reporting. Check that it is plugged into a black (USB 2) port; the console finds it by itself when plugged in."
+    : "No satellites heard. Put the receiver where it can see open sky: outside, or flat on a window sill away from metal and coated glass. A first fix can take 15 minutes. Still nothing after 15 minutes outside: unplug it for a minute and plug it back in.";
+}
+
+async function refreshGpsPanel() {
+  if (!gpsBox) return;
+  try {
+    const r = await getJSON("/api/gps");
+    if (gpsBox) renderGpsPanel(r.gps || {}, (state.data.weather && state.data.weather.location) || {});
+  } catch (e) {
+    if (gpsBox) gpsBox.querySelector(".g-facts").replaceChildren(gEl("span", "", "GPS"), gEl("span", "g-fair", "The console service didn't answer."));
+  }
+}
+
+function closeGps() {
+  if (gpsTimer) clearInterval(gpsTimer);
+  gpsTimer = null;
+  if (gpsBox) gpsBox.remove();
+  gpsBox = null;
+}
+
+function openGps() {
+  if (gpsBox) return;
+  gpsBox = gEl("div", "g-back");
+  gpsBox.setAttribute("role", "dialog");
+  gpsBox.setAttribute("aria-modal", "true");
+  gpsBox.setAttribute("aria-label", "GPS details");
+  gpsBox.innerHTML = `<div class="g-panel fair">
+      <div class="g-head"><h2>GPS</h2><span class="g-chip fair">…</span><button class="g-close">Close</button></div>
+      <div class="g-body">
+        <div class="g-sky"><div class="g-sky-plot"></div>
+          <div class="g-legend"><span><i class="used"></i>used in the fix</span><span><i class="heard"></i>heard, not used</span></div>
+          <div class="g-note">Centre = overhead · outer ring = horizon</div></div>
+        <div class="g-right"><div class="g-facts"></div>
+          <div class="g-sub">SIGNAL STRENGTH · dB-Hz (30+ is good)</div>
+          <div class="g-bars"></div><div class="g-tip" hidden></div></div>
+      </div></div>`;
+  gpsBox.querySelector(".g-close").addEventListener("click", closeGps);
+  gpsBox.addEventListener("click", e => { if (e.target === gpsBox) closeGps(); });
+  document.body.append(gpsBox);
+  gpsBox.querySelector(".g-sky-plot").replaceChildren(gpsSky([]));
+  refreshGpsPanel();
+  gpsTimer = setInterval(refreshGpsPanel, 2000);
+}
+
+function setUpGpsPill() {
+  const p = $("pill-gps");
+  if (!p) return;
+  p.setAttribute("role", "button");
+  p.classList.add("tappable");
+  p.addEventListener("click", openGps);
+}
+
 // ----------------------------------------------------------------- toolbar buttons
 
 /* Refresh: dimmed and "Refreshing…" until the new data is in, then "Updated" for a moment,
@@ -531,6 +695,7 @@ function startScreen(fns) {
   Object.assign(screen, fns);
   setUpClockTap();
   setUpToolbar();
+  setUpGpsPill();
   tickClock();
   setInterval(() => {
     tickClock();

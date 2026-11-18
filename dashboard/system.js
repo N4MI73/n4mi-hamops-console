@@ -134,11 +134,21 @@ function renderNet(s) {
   setFacts("net-facts", [
     ["Wi-Fi", wifi, wifiCls],
     ["Internet", internet, internetCls],
-    ["Location", location, locationCls],
+    ["Location", location, (locationCls + " wrap").trim()],
     ["GPS", gps, gpsCls],
-    ["Clock", clockText, clockCls],
+    ["Clock", clockText, (clockCls + " wrap").trim()],
     ["Backup clock", backup],
   ]);
+  // The GPS row opens the GPS details panel (approved 2026-11-18), as the GPS light does.
+  const gpsLabel = [...$("net-facts").querySelectorAll("dt")].find(d => d.textContent === "GPS");
+  if (gpsLabel && gpsLabel.nextElementSibling) {
+    const dd = gpsLabel.nextElementSibling;
+    const text = el("span", "g-row-text", dd.textContent);
+    const more = el("button", "g-more", "Details ›");
+    more.addEventListener("click", openGps);
+    dd.replaceChildren(text, more);
+    dd.classList.add("g-row");
+  }
 }
 
 /* One row per source: dot, name with what it supplies, and its age or state. */

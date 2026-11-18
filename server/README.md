@@ -18,6 +18,7 @@ The small Python service on the Pi that the dashboard talks to, run under system
 | `PUT /api/settings` | Change settings: send only what changes. Every value is checked and nothing is saved if anything is wrong; the reply lists every problem, or the saved settings plus any warnings (e.g. a 4-character grid). Takes effect at once, no restart |
 | `POST /api/settings/test` | Test connections: tries PropMon, Weather Sentinel and NWS and reports ok/failed and response time; `{"sources": {...}}` tests addresses before saving |
 | `GET /api/system` | The Pi's own status: temperature, power/throttling, memory, disk, network, clock, GPS (fix, satellites, GPS grid, time check) |
+| `GET /api/gps` | GPS details for the panel opened from the GPS light: satellites (direction, height, signal), position, altitude, accuracy, first fix, receiver (2026-11-18) |
 | `GET /healthz` | `{"status": "ok"}` and the service version |
 
 Every data block carries the same freshness fields (`status`: ok / stale / unavailable / test, `source`, `fetched_at`, `issued_at`, `age_sec`, `message`), decided in one place: `hamops_console/freshness.py`.
@@ -38,7 +39,7 @@ Every data block carries the same freshness fields (`status`: ok / stale / unava
 | `display.py` | Screen brightness by day and night from the settings, and Sleep (backlight off), through `/sys/class/backlight` (2026-11-11) |
 | `power.py` | Shut down and Restart from the touchscreen (`systemctl poweroff` / `reboot`; needs the polkit rule in `pi/polkit/`) (2026-11-11) |
 | `field_day.py` | The Field Day profile's timer: works out when setup starts (local midnight on the operations day) for the status-bar pill (2026-11-12) |
-| `gps.py` | GPS as a location source (Phase 4, 2026-11-18): reads gpsd on the Pi, keeps the fix and satellites, accepts a new 6-character grid after 2 minutes in the same subsquare (saved in `~/.local/state/hamops-console/gps.json`), and compares GPS time with the Pi's clock (never sets it) |
+| `gps.py` | GPS as a location source (Phase 4, 2026-11-18): reads gpsd on the Pi, keeps the fix and satellites, accepts a new 6-character grid after 2 minutes in the same subsquare (saved in `~/.local/state/hamops-console/gps.json`), and compares GPS time with the Pi's clock (never sets it); `details()` feeds the GPS details panel (`GET /api/gps`) |
 | `location.py` | The grid each data source uses: the typed grid, or the GPS grid for the Field station when its grid source is GPS (2026-11-18) |
 | `glm.py` | Field Mode lightning from NOAA's GOES satellite lightning mapper: reads GLM files, finds flashes near the site, applies the 20/10/5-mile tiers and the 30-minute clear. **Not yet wired into the service** (step 1, 2026-11-13). Needs `python3-netcdf4` to read files |
 | `nws_text.py` | Short "what" and "hazard" lines from NWS alert text (ported from Weather Sentinel) |
