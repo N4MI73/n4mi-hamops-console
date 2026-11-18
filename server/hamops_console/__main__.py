@@ -19,6 +19,7 @@ def main():
     settings = settings_mod.load()
     app = create_app(settings)
     app.extensions["hamops_display"].start()   # screen brightness by day and night
+    app.extensions["hamops_gps"].start()       # GPS reports from gpsd (Field grid, time check)
     server = settings["server"]
     logging.getLogger("hamops_console").info(
         "listening on http://%s:%s/", server["host"], server["port"])

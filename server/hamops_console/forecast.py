@@ -37,7 +37,7 @@ import urllib.error
 import urllib.request
 from datetime import timedelta
 
-from . import __version__, freshness, grid as grid_mod
+from . import __version__, freshness, grid as grid_mod, location as location_mod
 
 SOURCE = "NWS"
 API = "https://api.weather.gov"
@@ -291,8 +291,7 @@ class ForecastSource:
         self._error = None
 
     def _station_grid(self):
-        mode = self.settings["mode"]
-        return (self.settings["station"].get(mode) or {}).get("grid")
+        return location_mod.station_grid(self.settings, self.settings["mode"])
 
     # -- refresh (runs in the background)
     def _due(self, now, grid):

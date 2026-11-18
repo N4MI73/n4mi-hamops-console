@@ -135,10 +135,52 @@ function renderProfile() {
   $("station-head").textContent = `STATION · ${mode().toUpperCase()}`;
   $("f-callsign").textContent = station().callsign || "--";
   $("f-grid").textContent = station().grid || "--";
+  renderGps();
   const loc = (state.data.weather || {}).location || {};
   const warn = $("grid-warn");
   warn.hidden = !loc.grid_warning;
   warn.textContent = loc.grid_warning || "";
+}
+
+/* Grid from GPS (Phase 4, Dan 2026-11-18): Field station only. While GPS is chosen,
+   the typed grid is the fallback until the GPS has a position. */
+function ago(iso) {
+  const min = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+}
+
+function renderGps() {
+  const field = mode() === "field";
+  const useGps = field && station().grid_source === "gps";
+  press("gs-manual", !useGps);
+  press("gs-gps", useGps);
+  $("gs-gps").disabled = !field;
+  $("gs-gps-soon").hidden = field;
+  $("grid-label").textContent = useGps ? "Typed grid" : "Grid";
+  const note = $("gps-note");
+  note.hidden = !useGps;
+  if (!useGps) return;
+  const g = ((state.data.system || {}).system || {}).gps || {};
+  const loc = (state.data.weather || {}).location || {};
+  // The service's own answer decides the wording; the GPS block adds the details.
+  const from = loc.grid_from || (g.grid ? (g.grid_confirmed === false ? "gps_unconfirmed" : "gps") : "gps_waiting");
+  const grid = loc.grid || g.grid;
+  let text, warn = false;
+  if (from === "gps" || from === "gps_unconfirmed") {
+    text = `GPS grid ${grid}`;
+    if (from === "gps_unconfirmed") { text += " · from before the restart, not yet confirmed"; warn = true; }
+    if (g.fix) text += ` · ${g.fix.toUpperCase()} fix${g.satellites_used ? ` · ${g.satellites_used} satellites` : ""}`;
+    else if (from === "gps") { text += ` · no fix now${g.last_fix_at ? `, last ${ago(g.last_fix_at)}` : ""}`; warn = true; }
+    if (g.grid_pending) text += ` · checking ${g.grid_pending}`;
+  } else {
+    text = `Waiting for a GPS position · using the typed grid ${station().grid || "--"}`;
+    if (g.message) text += ` · ${g.message}`;
+    warn = true;
+  }
+  note.textContent = text;
+  note.classList.toggle("warn", warn);
 }
 
 function renderDisplay() {
@@ -368,6 +410,12 @@ function render() {
 
 $("src-home").addEventListener("click", () => { if (mode() !== "home") saveOrSay({mode: "home"}); });
 $("src-field").addEventListener("click", () => { if (mode() !== "field") saveOrSay({mode: "field"}); });
+$("gs-manual").addEventListener("click", () => {
+  if (station().grid_source === "gps") saveOrSay({station: {[mode()]: {grid_source: "manual"}}});
+});
+$("gs-gps").addEventListener("click", () => {
+  if (mode() === "field" && station().grid_source !== "gps") saveOrSay({station: {field: {grid_source: "gps"}}});
+});
 $("op-gen").addEventListener("click", () => { if (settings().profile === "field_day") saveOrSay({profile: "general_hf"}); });
 $("op-fd").addEventListener("click", () => { if (settings().profile !== "field_day") saveOrSay({profile: "field_day"}); });
 $("mc-utc").addEventListener("click", () => { if (mainClock() !== "utc") saveOrSay({display: {main_clock: "utc"}}); });

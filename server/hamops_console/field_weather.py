@@ -32,7 +32,7 @@ import threading
 import urllib.error
 from datetime import timedelta
 
-from . import alert_classes, freshness, grid as grid_mod
+from . import alert_classes, freshness, grid as grid_mod, location as location_mod
 from .forecast import API, fetch_json
 from .glm import compass, distance_mi
 from .nws_text import extract_reason_fields
@@ -208,7 +208,7 @@ class FieldWeather:
         self._stations = {"url": None, "list": None, "at": None}
 
     def _grid(self):
-        return (self.settings["station"].get("field") or {}).get("grid")
+        return location_mod.station_grid(self.settings, "field")
 
     def _t(self, key):
         return self.settings["thresholds"][key]

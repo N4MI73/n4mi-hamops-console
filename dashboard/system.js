@@ -90,9 +90,17 @@ function renderNet(s) {
 
   const mode = ((state.data.weather || {}).mode) || ((state.data.settings || {}).mode) || "home";
   const st = (((state.data.settings || {}).station) || {})[mode] || {};
-  const grid = ((state.data.weather || {}).location || {}).grid || st.grid;
-  const source = st.grid_source === "gps" ? "GPS" : "Manual";
-  const location = grid ? `${source} · ${grid}` : null;
+  const loc = (state.data.weather || {}).location || {};
+  const grid = loc.grid || st.grid;
+  // Phase 4 (2026-11-18): the service says where the grid really came from.
+  const from = loc.grid_from || (st.grid_source === "gps" ? "gps" : "manual");
+  let location = null, locationCls = "";
+  if (grid) {
+    if (from === "gps") location = `GPS · ${grid}`;
+    else if (from === "gps_unconfirmed") { location = `GPS · ${grid} · not yet confirmed`; locationCls = "fair"; }
+    else if (from === "gps_waiting") { location = `Typed · ${grid} · waiting for GPS`; locationCls = "fair"; }
+    else location = `Manual · ${grid}`;
+  }
 
   const g = s.gps || {};
   let gps = "Not connected", gpsCls = "";
@@ -100,8 +108,11 @@ function renderNet(s) {
     if (g.fix) {
       gps = `${g.fix.toUpperCase()} fix${num(g.satellites_used) ? ` · ${g.satellites_used} satellites` : ""}`;
       gpsCls = "good";
+    } else if (g.reporting === false && g.message) {
+      gps = `Plugged in · ${g.message}`;
+      gpsCls = "fair";
     } else {
-      gps = "Connected · no fix yet";
+      gps = `Connected · no fix yet${num(g.satellites_seen) ? ` · ${g.satellites_seen} satellites heard` : ""}`;
     }
   }
 
@@ -109,6 +120,12 @@ function renderNet(s) {
   let clockText = null, clockCls = "";
   if (c.synced === true) clockText = c.source === "gps" ? "GPS time" : "Internet time (NTP)";
   else if (c.synced === false) { clockText = "Not synced · RTC"; clockCls = "fair"; }
+  // GPS time is only compared, never used to set the clock (Dan, 2026-11-18).
+  if (clockText && g.time_check === "agrees") clockText += " · GPS agrees";
+  else if (clockText && g.time_check === "differs") {
+    clockText += ` · GPS differs by ${Math.abs(Math.round(g.time_offset_sec))} s`;
+    clockCls = "fair";
+  } else if (clockText && g.time_check === "gps_wrong") clockText += " · GPS date wrong, ignored";
 
   const r = s.rtc || {};
   let backup = null;
@@ -117,7 +134,7 @@ function renderNet(s) {
   setFacts("net-facts", [
     ["Wi-Fi", wifi, wifiCls],
     ["Internet", internet, internetCls],
-    ["Location", location],
+    ["Location", location, locationCls],
     ["GPS", gps, gpsCls],
     ["Clock", clockText, clockCls],
     ["Backup clock", backup],

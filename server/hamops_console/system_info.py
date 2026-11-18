@@ -4,8 +4,9 @@ Everything here reads local files or runs a local command. On a machine that
 isn't a Pi (e.g. a development PC), a reading that can't be taken is None,
 never an exception, so the service runs anywhere.
 
-GPS details come from gpsd in a later step; for now `gps` reports whether the
-receiver is plugged in.
+GPS details come from the GPS reader (gps.py, reading gpsd; 2026-11-18). Its
+block adds `reporting`, `grid_accepted_at`, `position_grid`, `grid_pending`,
+`time_offset_sec`, `time_check` and `message` to the contract's GPS fields.
 
 2026-11-10, for the System page: memory in GB, the Wi-Fi signal (from
 NetworkManager's last scan, never starting a new one) and the real-time
@@ -19,7 +20,7 @@ import socket
 import subprocess
 from pathlib import Path
 
-from . import freshness
+from . import freshness, location
 
 SOURCE = "Pi"
 
@@ -177,6 +178,10 @@ def clock():
 
 
 def gps():
+    """From the GPS reader (gps.py) when it runs; otherwise only whether the receiver is plugged in."""
+    source = location.gps_source()
+    if source is not None:
+        return source.block()
     present = Path("/dev/ttyUSB0").exists()
     return {"present": present, "fix": None, "satellites_used": None,
             "satellites_seen": None, "grid": None, "last_fix_at": None}

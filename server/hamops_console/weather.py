@@ -39,7 +39,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import alert_classes, freshness, grid as grid_mod
+from . import alert_classes, freshness, grid as grid_mod, location as location_mod
 from .field_weather import FieldWeather
 from .forecast import ForecastSource
 from .nwr import NwrSource
@@ -395,9 +395,10 @@ class WeatherSource:
     def _location(self):
         mode = self.settings["mode"]
         station = self.settings["station"].get(mode, {})
-        grid = station.get("grid")
+        grid = location_mod.station_grid(self.settings, mode)
         location = {"label": mode.capitalize(), "grid": grid,
-                    "grid_source": station.get("grid_source")}
+                    "grid_source": station.get("grid_source"),
+                    "grid_from": location_mod.grid_from(self.settings, mode)}
         location.update(self.forecast.location())
         location["grid_warning"] = (grid_mod.COARSE_WARNING
                                     if grid_mod.is_valid(grid) and len(grid.strip()) == 4 else None)

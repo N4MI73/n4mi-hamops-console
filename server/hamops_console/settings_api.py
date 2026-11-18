@@ -104,10 +104,13 @@ def check(changes, current):
                         else:
                             cleaned["station"][which][field] = call
                     elif field == "grid_source":
-                        if value == "gps":
-                            errors.append(f"{where}: GPS grid isn't available yet (Phase 4)")
-                        elif value != "manual":
-                            errors.append(f"{where} must be 'manual'")
+                        # GPS sets the Field grid only; the home grid is always typed (Dan, 2026-11-18).
+                        if value == "gps" and which == "home":
+                            errors.append(f"{where}: GPS is for the Field station only")
+                        elif value not in ("manual", "gps"):
+                            errors.append(f"{where} must be 'manual' or 'gps'")
+                        else:
+                            cleaned["station"][which][field] = value
                     elif field == "grid":
                         if not grid_mod.is_valid(value):
                             errors.append(f"{where}: a 4- or 6-character grid such as FM18lv")

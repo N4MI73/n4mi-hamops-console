@@ -34,7 +34,7 @@ from datetime import datetime, timedelta, timezone
 
 import os
 
-from . import freshness, grid as grid_mod
+from . import freshness, grid as grid_mod, location as location_mod
 try:                                    # needs python3-astral (Raspberry Pi OS package)
     from .fieldengine import field_engine as engine
 except ImportError:                     # the service still runs; Field propagation says why
@@ -215,7 +215,7 @@ class FieldPropagationSource:
         self._busy = False
 
     def _grid(self):
-        return (self.settings["station"].get("field") or {}).get("grid")
+        return location_mod.station_grid(self.settings, "field")
 
     def _scale(self):
         return "field_day" if self.settings.get("profile") == "field_day" else "dx"

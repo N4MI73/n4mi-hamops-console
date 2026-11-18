@@ -48,9 +48,10 @@
       <span class="st-head" id="station-head">STATION</span>
       <div class="st-row"><span class="st-label">Callsign</span><button class="field" id="f-callsign">--</button></div>
       <div class="st-row"><span class="st-label">Grid from</span>
-        <div class="seg small"><button aria-pressed="true" id="gs-manual">Manual</button><button disabled>GPS<span class="soon">Phase 4</span></button></div>
+        <div class="seg small"><button aria-pressed="true" id="gs-manual">Manual</button><button aria-pressed="false" id="gs-gps">GPS<span class="soon" id="gs-gps-soon" hidden>Field only</span></button></div>
       </div>
-      <div class="st-row"><span class="st-label">Grid</span><button class="field" id="f-grid">--</button></div>
+      <span class="st-note" id="gps-note" hidden></span>
+      <div class="st-row"><span class="st-label" id="grid-label">Grid</span><button class="field" id="f-grid">--</button></div>
       <span class="st-note warn" id="grid-warn" hidden></span>
     </section>
 

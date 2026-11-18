@@ -173,11 +173,14 @@ Weather is made of blocks that age separately, each with its own freshness field
 
 | Field | Notes |
 |---|---|
-| `label`, `grid`, `grid_source` | The current mode's station settings |
+| `label`, `grid`, `grid_source` | The current mode's station settings; `grid` is the grid in use (from GPS when the Field station's grid comes from GPS) |
+| `grid_from` | `manual`; `gps`; `gps_unconfirmed` (the GPS grid saved before the last restart, with no fix since, so it may be the previous site's; shown amber, "not yet confirmed"); or `gps_waiting` (GPS chosen but no GPS grid yet, so the typed grid is in use). Added 18 November 2026 |
 | `nws_office`, `nws_zone`, `nws_county` | From NWS `/points` for the grid's centre; `null` until known |
 | `grid_warning` | Text when the grid has only 4 characters ("about 70 x 115 miles, too coarse for local forecasts and alerts"), else `null` |
 
 The **centre of the current mode's grid** locates the console for NWS. A 4-character grid works but is flagged; a 6-character subsquare is about 3 × 5 miles. `/points` is looked up again when the grid changes and once a day.
+
+**GPS as the grid source (built 18 November 2026, Phase 4).** Offered for the **Field station only**; the home grid is always typed (Dan). The service reads the receiver through gpsd (Raspberry Pi OS package) on the Pi itself. A new GPS grid (6 characters) is accepted only after the same subsquare has held for **2 minutes** with a 2D or 3D fix, so a position at a square edge can't flip the grid back and forth (the console is used parked, never mobile: Dan). The accepted grid is kept through a lost fix and saved on the Pi (`~/.local/state/hamops-console/gps.json`, grid and time only), so after a restart at the site it is used until the next fix, marked `gps_unconfirmed` until a fix has been seen since the restart. The 2 minutes must be continuous: a report without a fix, or a gap of more than 10 s between fixes, starts the hold again. Until there is a GPS grid at all, the typed Field grid is used and `grid_from` is `gps_waiting`. Forecast, alerts, station, weather radio and Field propagation all follow the grid in use, so a GPS change reaches them like a typed change.
 
 ### Alerts (`alerts`)
 
@@ -466,6 +469,7 @@ No body. Ends both lightning holds early, on the operator's word, until the next
 - `power` comes from `vcgencmd get_throttled`.
 - `network.connection` is the NetworkManager profile name (e.g. `hotspot` in the field), never a password.
 - `clock.source` is `ntp`, `gps` or `rtc`. GPS time is used only when it's plausible against the RTC.
+- **GPS (built 18 November 2026):** from gpsd. `present` (reports in the last 10 s, or the receiver's device exists), `fix` (`"2d"`, `"3d"` or `null`; a fix older than 10 s is no fix), `satellites_used` / `satellites_seen`, `grid` (the accepted GPS grid, kept through a lost fix), `last_fix_at`, plus `reporting`, `grid_accepted_at`, `grid_confirmed` (a fix seen since the service started), `position_grid` (the subsquare of the current fix), `grid_pending` (a new subsquare waiting out its 2 minutes), `time_offset_sec` and `time_check` (`"agrees"` within 2 s, `"differs"`, `"gps_wrong"` when over a day apart, or `null` without a fix), and `message` ("gpsd isn't answering", "No GPS receiver reporting", "No fix yet", or `null`). **The console never sets the clock from GPS** (Dan, 18 November 2026): the RTC keeps time with no internet, and this receiver (BU-353S4, SiRF IV) reports a made-up date (2031) before its first fix, so GPS time is only compared, and only with a fix. The System page adds "GPS agrees" / "GPS differs by N s" / "GPS date wrong, ignored" to the Clock row; `clock.source` stays `ntp` or `rtc`.
 - Readings the service can't take (e.g. off the Pi) are `null`.
 - **Changed 10 November 2026 (System page):** added `memory_used_gb` / `memory_total_gb`, `network.wifi_signal_pct` (0–100, from NetworkManager's last scan with `--rescan no`, so reading it never starts a scan; `null` off Wi-Fi) and `rtc` (the Pi 5's real-time-clock backup battery: `battery_v` in volts and whether `charging` is on, read from the RTC's sysfs folder). `network.internet` and `network.home_sources_reachable`, drawn in earlier drafts, were never built: the screens judge the internet by whether NWS answers (the forecast block) and the home sources by their own blocks.
 - **Added 11 November 2026: the `display` block**, beside `system` in the same reply:
@@ -510,7 +514,7 @@ Everything the Settings screen may show and change. The service's listening addr
 
 - Stored on the Pi in `~/.config/hamops-console/settings.json`, outside the repository, so no real addresses or contact details are ever committed. The repository carries `config/settings.example.json` with placeholders.
 - `nws_user_agent_contact`: NWS asks every application to identify itself with a contact. It's sent in the `User-Agent` header: `HamOpsConsole/<version> (<contact>)`.
-- `grid_source`: `manual` only until GPS (Phase 4).
+- `grid_source`: `manual`, or `gps` for the **Field** station only (18 November 2026; `gps` for home is refused: "GPS is for the Field station only"). With `gps` the station's `grid` is kept as the fallback until the GPS has a position.
 
 ### `PUT /api/settings`
 
@@ -541,7 +545,7 @@ NWS is tested against a small JSON endpoint (its home page is HTML). `message` e
 
 The screen in the approved tabs uses only the three calls above plus `POST /api/weather-radio/refresh`. Every change is sent at once as its own `PUT`; there is no separate Save step. The service's reasons for refusing a change are shown where it was made (in the keyboard, or on the footer line), and nothing is saved.
 
-- **Station & profile:** callsign and grid for the current mode, typed on the on-screen keyboard. Data source Field is live since 17 November 2026 (it was disabled, "Phase 3", until Field propagation existed), GPS as the grid source "Phase 4", and the Field Day profile and economy mode "Coming"/"Phase 3". A 4-character grid shows the coarse-grid warning.
+- **Station & profile:** callsign and grid for the current mode, typed on the on-screen keyboard. Data source Field is live since 17 November 2026 (it was disabled, "Phase 3", until Field propagation existed), GPS as the grid source live for the Field station since 18 November 2026 (a line under it shows the GPS grid, fix and satellites, or that it is waiting for a position and using the typed grid, labelled "Typed grid"; for Home the GPS button reads "Field only"), and the Field Day profile and economy mode "Coming"/"Phase 3". A 4-character grid shows the coarse-grid warning.
 - **Display:** the main clock (working), day and night brightness, night style and night times. Brightness and night style are saved now; the screen follows them once brightness control is built (with Sleep and Shut down).
 - **Data sources:** the PropMon and Weather Sentinel addresses, Test connections, and the weather radio list's age with Update now (202 starts it; 409 means one is already running).
 - **Wi-Fi:** saved networks in preference order (up/down, Forget with two taps), nearby networks from the last scan with Scan again, and Join with the password typed on the on-screen keyboard (built 17 November 2026; see §10). Needs `pi/polkit/50-hamops-wifi.rules`.

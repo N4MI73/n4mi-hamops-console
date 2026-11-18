@@ -66,7 +66,8 @@ class Check(unittest.TestCase):
             ({"mode": "camping"}, "mode must be"),
             ({"station": {"home": {"callsign": "N0"}}}, "3 to 12"),
             ({"station": {"home": {"grid": "ZZ99"}}}, "4- or 6-character"),
-            ({"station": {"home": {"grid_source": "gps"}}}, "Phase 4"),
+            ({"station": {"home": {"grid_source": "gps"}}}, "Field station only"),
+            ({"station": {"field": {"grid_source": "glonass"}}}, "must be 'manual' or 'gps'"),
             ({"station": {"mobile": {}}}, "isn't home or field"),
             ({"display": {"day_brightness_pct": 120}}, "5 to 100"),
             ({"display": {"night_start": "25:00"}}, "24-hour"),
@@ -87,6 +88,8 @@ class Check(unittest.TestCase):
 
     def test_allowed_edges(self):
         self.assertEqual(self.errors({"sources": {"propmon_url": ""}}), [])
+        self.assertEqual(self.errors({"station": {"field": {"grid_source": "gps"}}}), [])
+        self.assertEqual(self.errors({"station": {"home": {"grid_source": "manual"}}}), [])
         self.assertEqual(self.errors({"thresholds": {"lightning_high_mi": 4.5,
                                                      "prop_bad_xray_classes": ["x", "M"]}}), [])
         self.assertEqual(self.errors("not an object"), ["send a JSON object with the settings to change"])

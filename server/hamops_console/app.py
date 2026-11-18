@@ -20,9 +20,10 @@ from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from . import __version__, alerts as alerts_mod, field_day, freshness, power, settings as settings_mod, settings_api, system_info
+from . import __version__, alerts as alerts_mod, field_day, freshness, location, power, settings as settings_mod, settings_api, system_info
 from .display import Display
 from .engine_check import EngineCheck
+from .gps import GpsSource
 from .field_propagation import FieldPropagationSource, ModePropagation
 from .propagation import PropagationSource
 from .weather import WeatherSource
@@ -34,7 +35,7 @@ DASHBOARD_DIR = REPO_ROOT / "dashboard"
 
 def create_app(settings=None, propagation=None, weather=None, acks=None, ended=None, dashboard_dir=DASHBOARD_DIR,
                settings_file=None, test_connections=settings_api.test_connections, display=None,
-               power_runner=None, wifi=None):
+               power_runner=None, wifi=None, gps=None):
     settings = settings or settings_mod.load()
     store = settings_api.SettingsStore(settings, settings_file)
     weather = weather or WeatherSource(settings)
@@ -46,9 +47,13 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
     ended = ended or alerts_mod.EndedStore()
     display = display or Display(settings)
     wifi = wifi or WiFi()
+    # GPS (Phase 4): sets the Field grid when the Field station's grid source is GPS.
+    gps = GpsSource() if gps is None else gps
+    location.use_gps(gps)
     started_at = freshness.utcnow()
     app = Flask(__name__, static_folder=None)
     app.extensions["hamops_display"] = display     # __main__ starts its day/night check
+    app.extensions["hamops_gps"] = gps             # __main__ starts its gpsd reader
 
     @app.after_request
     def revalidate(response):
