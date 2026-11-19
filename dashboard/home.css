@@ -258,7 +258,7 @@ html.night-red .cell span { font-size: 22px; font-weight: 800; }
 .help-head:not(:first-child) { margin-top: 6px; }
 .help-col p { margin: 0; font-size: 17px; line-height: 1.35; color: var(--ink-2); }
 .help-col b { color: var(--ink); }
-.help-col b.g { color: var(--good); } .help-col b.f { color: var(--fair-label); } .help-col b.p { color: var(--muted); }
+.help-col b.g { color: var(--good); } .help-col b.f { color: var(--fair-label); } .help-col b.p { color: var(--muted); } .help-col b.r { color: var(--bad); }
 .help-col .tip { margin-top: auto; padding: 10px 12px; background: var(--ground); border-radius: 8px; color: var(--ink); }
 .help-actions { height: 60px; flex-shrink: 0; display: flex; }
 .help-close {

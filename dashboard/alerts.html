@@ -48,7 +48,7 @@
     <button id="refresh">Refresh</button>
     <button data-href="/settings">Settings</button>
     <button id="sleep">Sleep</button>
-    <button disabled>Help<span class="soon">Coming</span></button>
+    <button id="help-open">Help</button>
     <div class="spacer"></div>
     <button class="shutdown" id="shutdown">Shut down…</button>
   </footer>
@@ -70,6 +70,33 @@
   </div>
 </div>
 
+<!-- Help (style approved 2026-11-13; wording approved by Dan 2026-11-19): a full-screen panel over the page; Close returns. -->
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+  <div class="help-top"><span class="help-title" id="help-title">Help · Alerts</span><span class="help-hint">What the Priority Card and this page show</span></div>
+  <div class="help-cols">
+    <section class="tile help-col">
+      <span class="help-head">THE PRIORITY CARD</span>
+      <p><b>Order, worst first</b>: NWS warnings and lightning within 5 mi (red, flashing) → NWS alerts unavailable while storms are possible → watches → lightning forecast → a data source down → notable propagation → All quiet.</p>
+      <p><b>Flashing red border</b>: a critical item. <b>Acknowledge</b> stops the flashing (it stops by itself after 2 minutes). The item stays on the card until it ends.</p>
+      <p><b>Several items</b>: the card moves on every minute; ‹ › to look through them. A critical item holds the card.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">THIS PAGE</span>
+      <p><b>On the Priority Card</b>: everything the card can show, worst first. <b>Details ›</b> gives the full NWS text and its instructions.</p>
+      <p><b>Notifications</b>: less urgent items: heat, cold, other warnings, notices. "New" until you've seen them. They also light the badge on the Alerts button.</p>
+      <p><b>Ended · last 24 hours</b>: NWS alerts that have ended, with the time.</p>
+      <p><b>Clear hold</b> (lightning items, two taps): ends a lightning hold early when you know the storm has passed. The next strike starts it again.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">WHEN DATA IS MISSING OR OLD</span>
+      <p><b>NWS alerts out of date / unavailable</b>: the alert list can't be checked. <b>Not the same as no alerts</b>: use NOAA Weather Radio, named on the card.</p>
+      <p><b>"Can't tell while NWS alerts are out of date"</b>: the Ended list only counts an alert as ended while the NWS feed is current, so an outage can't make a live warning look finished.</p>
+      <span class="help-head">SOUND</span>
+      <p>The console is visual only. NOAA Weather Radio is your audible alarm.</p>
+    </section>
+  </div>
+  <div class="help-actions"><button class="help-close" id="help-close">Close</button></div>
+</div>
 <div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
 <script src="/static/common.js"></script>
 <script src="/static/alerts.js"></script>

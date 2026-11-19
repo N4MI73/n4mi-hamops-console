@@ -58,11 +58,38 @@
     <button id="refresh">Refresh</button>
     <button data-href="/settings">Settings</button>
     <button id="sleep">Sleep</button>
-    <button disabled>Help<span class="soon">Coming</span></button>
+    <button id="help-open">Help</button>
     <div class="spacer"></div>
     <button class="shutdown" id="shutdown">Shut down…</button>
   </footer>
 
+</div>
+<!-- Help (style approved 2026-11-13; wording approved by Dan 2026-11-19): a full-screen panel over the page; Close returns. -->
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+  <div class="help-top"><span class="help-title" id="help-title">Help · System</span><span class="help-hint">What this Pi, its connections and its data sources are doing</span></div>
+  <div class="help-cols">
+    <section class="tile help-col">
+      <span class="help-head">THIS PI</span>
+      <p><b>CPU temperature</b>: <b class="f">amber</b> "warm" from 75 °C, <b class="r">red</b> "hot" from 80 °C, where the Pi starts to slow itself down. Check the fan and keep the cage out of the sun.</p>
+      <p><b>Power</b>: <b class="r">red</b> <b>Under-voltage now</b> means the supply can't keep up. Use the official 27 W supply, a short cable and the Jackery's AC outlet. <b class="f">Amber</b> means it happened since the last start.</p>
+      <p><b>Memory, disk, load, uptime</b>: for spotting trouble; normal is low.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">NETWORK · LOCATION · TIME</span>
+      <p><b>Wi-Fi and Internet</b>: which network and how strong. Internet "Reachable" means NWS answers. Join networks in Settings → Wi-Fi.</p>
+      <p><b>Location</b>: where the grid comes from: Manual, GPS, or "waiting for GPS" (typed grid in use). Amber "not yet confirmed" means the last GPS grid from before a restart, until the next fix.</p>
+      <p><b>GPS</b>: fix and satellites. <b>Details ›</b> (or tap the GPS light) opens the sky view.</p>
+      <p><b>Clock</b>: internet time, or the backup clock (RTC) with no internet. "GPS agrees" is a cross-check only: the console never sets its clock from GPS. <b>Backup clock</b>: the RTC battery that keeps time while powered off.</p>
+      <p class="tip">Put the GPS receiver outside with open sky; indoors it may hear satellites without a fix.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">DATA SOURCES</span>
+      <p>One line per source, with a dot: <b class="g">green</b> current, <b class="f">amber</b> old, <b class="r">red</b> unavailable, and the reason when it isn't green.</p>
+      <p><b>Home Mode</b>: PropMon and the home weather station on the home network. <b>Field Mode</b>: HamQSL and NOAA over the internet, and NWS for the Field grid.</p>
+      <p><b>Weather radio list</b>: age of the stored transmitter list. Update it at home before a field trip (Settings → Data sources → Update now).</p>
+    </section>
+  </div>
+  <div class="help-actions"><button class="help-close" id="help-close">Close</button></div>
 </div>
 <div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
 <script src="/static/common.js"></script>

@@ -76,11 +76,40 @@
     <button id="refresh">Refresh</button>
     <button data-href="/settings">Settings</button>
     <button id="sleep">Sleep</button>
-    <button disabled>Help<span class="soon">Coming</span></button>
+    <button id="help-open">Help</button>
     <div class="spacer"></div>
     <button class="shutdown" id="shutdown">Shut down…</button>
   </footer>
 
+</div>
+<!-- Help (style approved 2026-11-13; wording approved by Dan 2026-11-19): a full-screen panel over the page; Close returns. -->
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+  <div class="help-top"><span class="help-title" id="help-title">Help · Weather</span><span class="help-hint">What this page shows and how to read it</span></div>
+  <div class="help-cols">
+    <section class="tile help-col">
+      <span class="help-head">THIS LOCATION</span>
+      <p><b>Lightning</b>: detected lightning near the console. At home it comes from the home weather station (Tempest): <b class="f">amber</b> within 10 mi, flashing <b class="r">red</b> within 5 mi.</p>
+      <p>The 5-mile alert holds for 30 minutes after the last strike (the 30/30 rule). <b>Clear</b> ends it early if you know the storm has gone; the next strike restarts it.</p>
+      <p><b>Lightning possible / likely</b>: an NWS <i>forecast</i>, not a detection. A reason to watch the sky and the radio.</p>
+      <p><b>NWS alerts</b>: the worst active warning, watch or advisory for this spot, with when it ends.</p>
+      <p class="tip">A Severe Thunderstorm Warning is about wind and hail; lightning can come with any storm, warned or not.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">NOW AND FORECAST</span>
+      <p><b>Now</b>: at home, the home weather station. In Field Mode, the nearest NWS station (often an airport 10–30 mi away, updated about hourly).</p>
+      <p><b>Forecast</b>: NWS periods and the next 12 hours, with temperature, lightning chance, rain chance and gusts (marked from 25 mph).</p>
+      <p><b>Weather Radio</b>: the NOAA Weather Radio transmitter for this county, with its frequency and the county's SAME code for your radio. "Not listed for county" means the nearest one may not carry this county's warnings.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">WHEN DATA IS MISSING OR OLD</span>
+      <p><b>STALE · N MIN</b>: no fresh data for a while. Shown greyed; treat it as old.</p>
+      <p><b>NWS alerts out of date / unavailable</b>: the console can't check NWS just now. <b>Not the same as no alerts</b>: listen to NOAA Weather Radio.</p>
+      <p><b>Home weather station in test mode</b>: the station is being bench-tested; its alerts and lightning are ignored until it finishes.</p>
+      <span class="help-head">HOME AND FIELD</span>
+      <p>Home Mode uses the home weather station and home grid; Field Mode uses NWS for the Field grid (typed, or from GPS).</p>
+    </section>
+  </div>
+  <div class="help-actions"><button class="help-close" id="help-close">Close</button></div>
 </div>
 <div class="service-down" id="service-down" hidden>Console service not answering. Data on screen may be old. NWS alerts: check NOAA Weather Radio.</div>
 <script src="/static/common.js"></script>
