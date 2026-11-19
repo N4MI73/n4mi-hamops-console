@@ -253,10 +253,10 @@ html.night-red .cell span { font-size: 22px; font-weight: 800; }
 .help-title { font-size: 28px; font-weight: 700; }
 .help-hint { font-size: 18px; color: var(--muted); }
 .help-cols { flex-grow: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.help-col { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; overflow: hidden; }
+.help-col { display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; overflow: hidden; }
 .help-head { font-size: 16px; font-weight: 600; letter-spacing: 0.1em; color: var(--muted); }
 .help-head:not(:first-child) { margin-top: 6px; }
-.help-col p { margin: 0; font-size: 17px; line-height: 1.35; color: var(--ink-2); }
+.help-col p { margin: 0; font-size: 19px; line-height: 1.28; color: var(--ink-2); }  /* 19 px at Dan's request (2026-11-19); fits the fullest column, Field Day Propagation */
 .help-col b { color: var(--ink); }
 .help-col b.g { color: var(--good); } .help-col b.f { color: var(--fair-label); } .help-col b.p { color: var(--muted); } .help-col b.r { color: var(--bad); }
 .help-col .tip { margin-top: auto; padding: 10px 12px; background: var(--ground); border-radius: 8px; color: var(--ink); }
