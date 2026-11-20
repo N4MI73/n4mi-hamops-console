@@ -66,6 +66,7 @@ The rules, in order:
 | Local conditions, Home (Tempest) | 1 min | 5 min, or at once if Sentinel says `available: false` | — | |
 | Local conditions, Field (NWS station) | 15 min (`station_obs_fetch_min`), in the background | 90 min (`station_obs_stale_min`) | — | Built 16 November 2026; aged by the observation's own time |
 | Lightning, Home (Tempest) | 1 min | 5 min (`lightning_stale_min`) | — | Home only |
+| Lightning, Field (GOES satellite) | Only while switched on: every 20 s on Full (each new 20-second file), every 60 s on Economy (one file a minute), in the background | 3 min with no new file (`glm_stale_min`) | — | Built 20 November 2026. About 60 MB an hour on Full, 20 MB on Economy. Flashes already seen keep their holds while stale |
 | Forecast (both modes) | 30 min (`forecast_fetch_min`), in the background | NWS `updateTime` older than 12 h | — | Retried 2 min after a failure |
 | System | every request | never | — | It's the Pi itself |
 
@@ -90,6 +91,7 @@ The dashboard polls the service every 15 seconds.
 | `GET /api/alerts` | The ranked list behind the Priority Card and Alerts page (§6) | Yes |
 | `POST /api/alerts/ack` | `{"id": "..."}`: the console's own Acknowledge (§6) | Yes |
 | `POST /api/alerts/clear-hold` | Ends the lightning holds early, by the operator (§6) | **New in 0.4** |
+| `POST /api/lightning` | Field Mode lightning detection: on, off, Keep on, dismiss, and the at-home test (§5) | Yes (20 Nov 2026) |
 | `GET /api/system` | Pi and network status (§7) | Yes |
 | `GET /api/settings` | Settings (§8) | Yes |
 | `PUT /api/settings` | Change settings; returns the saved settings (§8) | Yes |
@@ -248,7 +250,7 @@ The word lists live in one file in the service.
 - **Home:** from Sentinel's `tempest` block; `station` is `null` (it's your own Tempest); `pressure_inhg` is station pressure.
 - **Field (built 16 November 2026):** the nearest NWS observation station; `station` is `{"id", "name", "distance_mi"}` (NWS's own distance from the location, else worked out from the station's position); `rain_rate_in_hr` is `null`. The station list comes from the forecast's `/points` lookup (`observationStations`), checked once a day. If the nearest station's latest report is over 2 hours old or has no temperature, the next is tried (up to three); if none is good, the freshest found is shown and ages to stale. NWS units are metric and converted; a value that failed NWS quality control (`"X"`) is missing. `feels_like_f` is the wind chill when NWS gives one, else the heat index, else the temperature. `pressure_inhg` is NWS `barometricPressure`. `wind_dir` is `null` when calm.
 
-### Lightning (`lightning`, Home only)
+### Lightning, Home Mode (`lightning`, from Weather Sentinel)
 
 ```json
 "lightning": {
@@ -289,6 +291,70 @@ The word lists live in one file in the service.
 - **Recorded:** `cleared_at` is kept for 24 hours, and the Alerts page shows "Lightning hold cleared by operator at 3:20 PM (20:20 UTC)".
 
 **In Sentinel's simulation:** `status` is `test`, every flag is `null`, and simulated strikes never start a hold.
+
+### Lightning, Field Mode (`lightning`, GOES satellite; built 20 November 2026)
+
+From NOAA's GOES Geostationary Lightning Mapper (GLM), read on the Pi from NOAA's public files (`sources.glm_east_url` / `glm_west_url`, chosen by `field_lightning.satellite`). **Detection is off until someone turns it on**, because it downloads about 60 MB an hour (Full) or 20 MB (Economy). Design agreed with Dan 12 and 20 November 2026.
+
+```json
+"lightning": {
+  "status": "ok", "source": "GOES satellite",
+  "fetched_at": "2026-07-04T22:41:20Z", "issued_at": "2026-07-04T22:40:40Z", "age_sec": 40, "message": null,
+  "within_20mi": true, "within_10mi": false, "within_5mi": false, "frequent": false,
+  "closest_mi": 14.2, "closest_bearing": "WSW",
+  "last_strike_at": "2026-07-04T22:40:52Z",
+  "strikes_recent": 6, "window_min": 10,
+  "hold_until_20mi": "2026-07-04T23:10:52Z", "hold_until_10mi": null, "hold_until_5mi": null, "hold_since_5mi": null,
+  "cleared_at": null,
+  "detection": {
+    "on": true, "level": "full", "satellite": "east", "satellite_name": "GOES-East",
+    "turned_on_at": "2026-07-04T22:10:00Z", "outlook_seen": true, "auto_off_at": null,
+    "off_waiting_for_hold": false, "question": null, "starting": false,
+    "turned_off_at": null, "off_reason": null, "recent_at_off": null, "reader": true
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `status` | The usual freshness, plus **`off`** while detection is off. Aged by the newest file's start time (`issued_at`); stale after `glm_stale_min` (3) with no new file (a minute more on Economy). `unavailable` until the first file arrives. A file that can't be read is skipped (and named in `message`), never retried endlessly |
+| `within_20mi`, `within_10mi`, `within_5mi` | A flash inside `lightning_field_outer_mi` (20), `lightning_notify_mi` (10) or `lightning_high_mi` (5) in the last `lightning_hold_min` (30) minutes. **One flash is enough.** `null` (unknown, never `false`) while detection is off, or with no current satellite data. **A hold from a flash already seen stands whatever the freshness** (just turned on, just restarted, files late): with no current data the tiers it reaches are `true` and the others `null` |
+| `frequent` | More than `lightning_frequent_per_min` (5) flashes inside 10 mi in the last minute |
+| `closest_mi`, `closest_bearing` | The closest flash inside 20 mi in the last 30 minutes, with a 16-point compass direction from the site |
+| `last_strike_at`, `strikes_recent`, `window_min` | The latest flash inside 20 mi, and how many in the last 10 minutes ("6 flashes in the last 10 min"). GLM counts **flashes** (all the light from one discharge, in cloud or to ground) |
+| `hold_until_20mi`, `_10mi`, `_5mi`, `hold_since_5mi` | As at home: 30 minutes after the last flash inside each distance; `hold_since_5mi` is the first flash of the current 5-mile hold, so it flashes once per hold |
+| `cleared_at` | The operator's Clear hold (as at home; `POST /api/alerts/clear-hold` works in both modes). A flash counts as new when it **arrives** after the Clear: files come 30–60 s after the flash, so one the operator couldn't yet have known about is never cleared away |
+| `detection` | The switch: below |
+
+**Where:** the centre of the Field station's grid (the GPS grid when the grid source is GPS). When the grid changes, the kept flashes are measured again from the new centre (each is kept with its position), so a hold survives a GPS grid moving to the next subsquare. Switching satellite starts from the newest file.
+
+**Reading the files** needs `python3-netcdf4` on the Pi (apt). Without it nothing is downloaded and `detection.reader` is `false`; the block says why.
+
+**On and off** (`detection`):
+- **Turned on by hand** (`POST /api/lightning {"action": "on"}`, Field Mode only): the forecast card's Turn on lightning detection button, the Weather page or Settings. It starts with the newest file only; nothing older is fetched. For the first 2 minutes (`starting: true`) no "data late" card is raised.
+- **With an NWS lightning outlook** (the forecast's `lightning_outlook`, which a Severe Thunderstorm Watch or Warning also sets): once one has been seen while on (`outlook_seen`), detection stays on until the outlook clears, then turns itself off (`off_reason` `outlook_cleared`). **Only a current forecast (status `ok`) with no outlook, while the NWS alerts are `ok` or `stale`, counts as clearing**: an outlook from a Watch disappears from the forecast when the alerts can't be read, and that isn't a clearing. An unavailable or stale forecast never turns detection off.
+- **With no outlook** (Dan, 20 November 2026): stays on until turned off, at most `glm_auto_off_hours` (6, `auto_off_at`; `off_reason` `time_limit`). After `glm_ask_first_min` (30) `question` is `{"stage": "30min", "asked_at"}`: the screen asks "Lightning detection has been on for 30 min with no storms forecast. Keep it on?" with **Keep on** and **Turn off**. No answer: it stays on. After Keep on it asks once more at `glm_ask_again_hours` (3, `stage` `"3h"`), then turns itself off at 6 hours. An outlook arriving first ends the questions and the time limit. **The screen never puts the question over a flashing critical alert**: it waits until that alert is acknowledged or ends.
+- **An automatic turn-off waits while lightning is near**: with a flash inside 20 mi in the last 30 minutes, `off_waiting_for_hold` is `true` and detection stays on until that hold clears. The console never switches its own lightning warning off.
+- **Turned off by hand with lightning recent:** if flashes were inside 20 mi in the last 30 minutes, `recent_at_off` is `{"last_strike_at", "closest_mi", "closest_bearing", "until"}` and the alert list carries an amber `lightning_off_recent` card (§6). It goes when tapped (turn back on), dismissed (`dismiss_recent`), or at `until` (30 minutes after the last flash). It never reads as an all-clear.
+- **Saved on the Pi** in `~/.local/state/hamops-console/field_lightning.json`: the switch, when it was turned on, the answers, the recent nearby flashes, the last file read and today's data count. A restart changes nothing; after one it catches up on files missed in the last 5 minutes. A missing or damaged file starts with detection off.
+
+**`POST /api/lightning`** `{"action": ...}`, replies `no-store`:
+
+| `action` | Does | Reply |
+|---|---|---|
+| `on` | Turns detection on (also ends the `recent_at_off` card) | 200 `{"detection": {...}}`; 409 in Home Mode |
+| `off` | Turns detection off (the operator) | 200 `{"detection": {...}}` |
+| `keep_on` | Answers the question | 200; 409 "No question waiting" |
+| `dismiss_recent` | Dismisses the `recent_at_off` card | 200; 409 "Nothing to dismiss" |
+| `home_test_on`, `home_test_off` | The at-home test, below | 200 `{"satellite_lightning": {...}}` (§7) |
+
+Anything else: 400.
+
+**At-home test** (Dan, 20 November 2026): `home_test_on` runs the same loop in **Home Mode**, at the centre of the home grid, so the satellite can be compared with the home Tempest. Its results appear only in `/api/system`'s `satellite_lightning.test` (§7), never in the weather blocks or the alert list. Switched with an SSH command for now:
+
+```
+curl -s -X POST -H 'Content-Type: application/json' -d '{"action": "home_test_on"}' http://127.0.0.1:8090/api/lightning
+```
 
 ### NOAA Weather Radio (`weather_radio`, both modes; built 7 November 2026)
 
@@ -415,17 +481,22 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
 | 3 | `alerts_unavailable_storms` | NWS alerts `unavailable` or `stale`, **and** a `lightning_outlook` starting within 6 h (`storms_forecast_hours`) | red | card | no |
 | 4 | `hazard_alert` | NWS watch, advisory or statement with `hazard_class` = `site_hazard` | yellow | card | no |
 | 5 | `lightning_likely_soon` | `lightning_outlook.level` = `likely` starting within 2 h | yellow | card | no |
-| 6 | `lightning_frequent` | `frequent` (Home) | yellow | card | no |
-| 7 | `lightning_10mi` | `within_10mi` (Home) | yellow | card | no |
-| 8 | `lightning_outlook` | `lightning_outlook` possible, or likely more than 2 h out | yellow | card | no |
-| 9 | `source_down` | A source stale, unavailable, **or in test mode** (one item per source). **The NWS alerts card comes first among these** (5 November 2026) | yellow | card | no |
-| 10 | `propagation` | Notable propagation (below) | green (good) / yellow (bad) | card | no |
-| 11 | `all_quiet` | No other card item | green | card | no |
+| 6 | `lightning_frequent` | `frequent` (both modes) | yellow | card | no |
+| 7 | `lightning_10mi` | `within_10mi` (both modes) | yellow | card | no |
+| 8 | `lightning_20mi` | `within_20mi` (Field, GOES satellite; 20 November 2026) | yellow (amber) | card | no |
+| 9 | `lightning_off_recent` | Field detection turned off with `recent_at_off` (§5); carries `"action": "lightning_on"` | yellow | card | no |
+| 10 | `lightning_outlook` | `lightning_outlook` possible, or likely more than 2 h out | yellow | card | no |
+| 11 | `source_down` | A source stale, unavailable, **or in test mode** (one item per source). **The NWS alerts card comes first among these** (5 November 2026) | yellow | card | no |
+| 12 | `propagation` | Notable propagation (below) | green (good) / yellow (bad) | card | no |
+| 13 | `all_quiet` | No other card item | green | card | no |
 | — | `temperature_alert` | Any NWS product with `hazard_class` = `temperature` | yellow | badge | no |
 | — | `other_warning` | NWS warning with `hazard_class` = `other` | blue | badge | no |
 | — | `other_notice` | NWS advisory or statement with `hazard_class` = `other` | blue | badge | no |
 
-- **One detected-lightning item at a time:** the highest that applies (5 mi beats frequent beats 10 mi). Lightning data is used only when its block is `ok`. One forecast-lightning item can appear as well.
+- **One detected-lightning item at a time:** the highest that applies (5 mi beats frequent beats 10 mi beats 20 mi). Home lightning data is used only when its block is `ok`; **Field (GOES) lightning whenever detection is on**, because the block sets a tier only from flashes actually seen and a flash already seen keeps its hold when newer files are late. One forecast-lightning item can appear as well.
+- **Field lightning wording (20 November 2026):** `lightning_20mi` is "Lightning within 20 mi" with "14 mi WSW at 6:41 PM (22:41 UTC). 6 flashes in the last 10 min. GOES satellite · check your lightning app."; the 10- and 5-mile items read "Lightning 8.2 mi WSW" with the same flash count, the Wait / Stay in time and the same last line. The 5-mile item is critical and flashes once per hold, as at home.
+- **Field lightning switched off:** while detection is off, the forecast-lightning item carries `"action": "lightning_on"` (the Turn on lightning detection button on the card). A switched-off block (`status` `off`) never makes a `source_down` card. When detection is on and its files are late, the `source_down` card is "Lightning data late" (stale) or "Lightning data unavailable", with "Not the same as no lightning."; none while `detection.starting`.
+- **The keep-on question is not an alert item.** It is `lightning.detection.question` (§5); the screen shows it as a popup, never over a flashing critical alert.
 - **Stale NWS alerts are still ranked**, beside a `source_down` card saying the alerts are stale. After 30 minutes they're unavailable and drop out.
 - **NWS alerts outage (5 November 2026).** When the `alerts` block is stale or unavailable, its `source_down` card is titled "NWS alerts out of date" or "NWS alerts unavailable" (not the source's name, since in Home Mode Sentinel may be answering while it can't reach NWS), its detail is the block's `message` followed by "Not the same as no alerts.", its `ref.id` is `source-nws-alerts`, and it comes before the other `source_down` cards whatever their `since`. Other blocks from the same source fold into that one card, as before.
 - **Sentinel test mode** shows as a `source_down` card titled "Home weather station in test mode". Otherwise the card could read "All quiet." while real alerts can't pass through.
@@ -437,7 +508,7 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
 
 ### Clear lightning hold — `POST /api/alerts/clear-hold` (new in 0.4)
 
-No body. Ends both lightning holds early, on the operator's word, until the next strike (see §5 Lightning). It's allowed only while a lightning item (`lightning_5mi`, `lightning_frequent` or `lightning_10mi`) is in the list; otherwise it returns 409, "No lightning hold to clear". Returns `{"cleared_at": "<time>"}`. The dashboard asks for confirmation first. Never forwarded to Weather Sentinel.
+No body. Ends both lightning holds early, on the operator's word, until the next strike (see §5 Lightning). In Field Mode it clears the GOES satellite holds. It's allowed only while a lightning item (`lightning_5mi`, `lightning_frequent`, `lightning_10mi` or, in Field Mode, `lightning_20mi`) is in the list; otherwise it returns 409, "No lightning hold to clear". Returns `{"cleared_at": "<time>"}`. The dashboard asks for confirmation first. Never forwarded to Weather Sentinel.
 
 ---
 
@@ -472,6 +543,9 @@ No body. Ends both lightning holds early, on the operator's word, until the next
 - **`GET /api/gps` (built 18 November 2026): the GPS details panel** (approved mockup "GPS details", Dan 18 November 2026), opened by tapping the GPS light in the status bar on any screen, or "Details ›" on the System page's GPS row; it reads this endpoint every 2 s while open. Reply: `{"generated_at", "gps": {...}}` with everything in the `gps` block below plus `satellites` (`[{"prn", "az", "el", "ss", "used"}]`: direction and height in degrees, signal in dB-Hz, whether used in the fix; empty when the receiver isn't reporting), `hdop`, `lat` / `lon` (5 places, only with a fix; held in memory only, never saved), `alt_m` (only with a 3D fix), `accuracy_m` (gpsd's horizontal error estimate), `gps_time`, `searching_since` (when the receiver started reporting this time), `first_fix_sec` (how long the first fix took), `gpsd_release` and `device` (`{"path", "driver", "bps"}`). The panel shows a sky plot (centre overhead, outer ring the horizon; green = used, grey ring = heard), satellites used/heard, the grid in use and where it came from, position (Dan: keep latitude and longitude), altitude in metres with feet, accuracy and HDOP, GPS time against the Pi clock, last and first fix, the receiver, and one signal bar per satellite (30 dB-Hz and up is good); with no fix, an amber border and what to try.
 - **GPS (built 18 November 2026):** from gpsd. `present` (reports in the last 10 s, or the receiver's device exists), `fix` (`"2d"`, `"3d"` or `null`; a fix older than 10 s is no fix), `satellites_used` / `satellites_seen`, `grid` (the accepted GPS grid, kept through a lost fix), `last_fix_at`, plus `reporting`, `grid_accepted_at`, `grid_confirmed` (a fix seen since the service started), `position_grid` (the subsquare of the current fix), `grid_pending` (a new subsquare waiting out its 2 minutes), `time_offset_sec` and `time_check` (`"agrees"` within 2 s, `"differs"`, `"gps_wrong"` when over a day apart, or `null` without a fix), and `message` ("gpsd isn't answering", "No GPS receiver reporting", "No fix yet", or `null`). **The console never sets the clock from GPS** (Dan, 18 November 2026): the RTC keeps time with no internet, and this receiver (BU-353S4, SiRF IV) reports a made-up date (2031) before its first fix, so GPS time is only compared, and only with a fix. The System page adds "GPS agrees" / "GPS differs by N s" / "GPS date wrong, ignored" to the Clock row; `clock.source` stays `ntp` or `rtc`.
 - Readings the service can't take (e.g. off the Pi) are `null`.
+- **Added 20 November 2026: the `satellite_lightning` block**, beside `system`: what the GOES satellite loop is doing and the data it has used (Dan asked for a data counter).
+  `"satellite_lightning": {"running": "field" | "home_test" | null, "home_test": false, "home_test_since": null, "level": "full", "satellite": "east", "satellite_name": "GOES-East", "reader": true, "status": "ok", "message": null, "newest_file_at": "...", "mb_today": 412.6, "mb_last_hour": 58.9, "files_today": 1250, "test": null}`.
+  `mb_today` is since local midnight (saved, so a restart doesn't zero it); `mb_last_hour` is the last 60 minutes since the service started. During the at-home test, `test` holds that test's own `within_20mi`, `within_10mi`, `within_5mi`, `closest_mi`, `closest_bearing`, `last_strike_at`, `strikes_recent` and `window_min`, for the System page.
 - **Changed 10 November 2026 (System page):** added `memory_used_gb` / `memory_total_gb`, `network.wifi_signal_pct` (0–100, from NetworkManager's last scan with `--rescan no`, so reading it never starts a scan; `null` off Wi-Fi) and `rtc` (the Pi 5's real-time-clock backup battery: `battery_v` in volts and whether `charging` is on, read from the RTC's sysfs folder). `network.internet` and `network.home_sources_reachable`, drawn in earlier drafts, were never built: the screens judge the internet by whether NWS answers (the forecast block) and the home sources by their own blocks.
 - **Added 11 November 2026: the `display` block**, beside `system` in the same reply:
   `"display": {"control": true, "device": "<backlight name>", "asleep": false, "night": false, "brightness_pct": 80, "message": null}`.
@@ -524,7 +598,8 @@ Send **only what changes**, e.g. `{"station": {"home": {"grid": "FM18lv"}}}`.
 - **Every value is checked first. If anything is wrong, nothing is saved.** The reply is 400 with every problem listed: `{"errors": ["mode must be 'home' or 'field'", ...]}`.
 - On success: 200 with the saved settings (as `GET`) plus `"warnings": [...]`, e.g. for a 4-character grid.
 - Callsigns are upper-cased; grids are written `FM18lv` style.
-- Ranges are checked for every threshold; `lightning_high_mi` can't exceed `lightning_notify_mi`.
+- Ranges are checked for every threshold; `lightning_high_mi` can't exceed `lightning_notify_mi`, which can't exceed `lightning_field_outer_mi`; and `glm_ask_first_min` < `glm_ask_again_hours` < `glm_auto_off_hours`.
+- **Field lightning (20 November 2026):** `field_lightning {"level": "full" | "economy", "satellite": "east" | "west"}` (defaults Full, East). Turning detection on and off is **not** a setting: it is `POST /api/lightning` (§5), shown on the Settings tile. `sources` gains `glm_east_url` (`https://noaa-goes19.s3.amazonaws.com`) and `glm_west_url` (`https://noaa-goes18.s3.amazonaws.com`): when NOAA moves a satellite, change the address. `thresholds` gain `lightning_field_outer_mi` (20, 5–30), `glm_stale_min` (3, 1–30), `glm_auto_off_hours` (6, 1–24), `glm_ask_first_min` (30, 5–240) and `glm_ask_again_hours` (3, 1–12).
 - The file is written to a new copy and swapped in, so a power cut can't leave it half-written. Comments (`_comment` keys), other entries such as `server`, and the file's permissions are kept. A damaged file is set aside as `settings.json.broken` rather than overwritten.
 - **Changes take effect at once, with no restart.** A new grid triggers a fresh NWS lookup.
 
@@ -561,7 +636,7 @@ The screen in the approved tabs uses only the three calls above plus `POST /api/
 | propagation | PropMon | HamQSL + NOAA SWPC, rated on the Pi by Ham Shack Automation's field engine (17 Nov 2026) |
 | weather.alerts | Weather Sentinel `nws` | NWS `/alerts/active?point=` for the Field grid's centre |
 | weather.conditions | Weather Sentinel `tempest` | Nearest NWS observation station |
-| weather.lightning | Weather Sentinel `lightning` | `null` |
+| weather.lightning | Weather Sentinel `lightning` | GOES satellite (GLM), switched on by hand (20 Nov 2026); `status` `off` until then |
 | weather.forecast | NWS forecast for the home grid | NWS forecast for the field grid |
 | weather.weather_radio | Stored NWR list, home location | Stored NWR list, field location |
 | alerts | Built by the service | Built by the service |
@@ -586,6 +661,8 @@ In Field Mode the home station is never asked. Field Mode alerts and conditions 
 **Decided (16 November 2026):** alert times follow NWS CAP meaning. `ends` added to alert items; "until" and the Ended list's end time use `ends`; alerts are no longer dropped when `expires` passes, in either mode (§5). Field Mode NWS alerts (exact point) and nearest-station conditions built; settings gain `thresholds.nws_alerts_fetch_min` (2) and `thresholds.station_obs_fetch_min` (15).
 
 **Decided (17 November 2026):** Field Mode propagation built on Ham Shack Automation's field engine (§4), with its DX scale and, under the Field Day profile, its Field Day scale (North America reach; Dan accepted Ham Shack Automation's offer the same day, replacing the "FAIR or better = open for North America" stopgap of 16 November). The engine copy carries no home coordinates: its EM83 example and test cases use the centre of EM83 (Dan). Version check `engine` in the propagation block (§4). Settings gain `thresholds.field_propagation_fetch_min` (10) and `sources.field_engine_url`; Data source Field is enabled. Help gains Ham Shack Automation's FAIR line and the Field Day meanings.
+
+**Decided (20 November 2026): Field lightning from the GOES satellite** (§5, §6, §7, §8), as agreed 12 November with Dan's additions: a hand turn-on with no NWS outlook stays on until turned off, at most 6 hours, asking "keep it on?" at 30 minutes and once more at 3 hours after Keep on (no answer: stays on; never over a flashing critical alert; an outlook arriving first switches to the outlook rule); the switch survives a restart; an at-home test switched by an SSH command, results on the System page only. Added in building, for Dan to confirm: an automatic turn-off waits while a flash is inside 20 mi in the last 30 minutes; only a current forecast with no outlook (and NWS alerts readable) counts as the outlook clearing; Field lightning holds stay shown while the satellite data is late or missing; a flash arriving after the operator's Clear counts as new.
 
 **Wi-Fi from the touchscreen (built 17 November 2026; mockups approved 5 November).** The Settings Wi-Fi tab. The service runs `nmcli` as user `hamops`; saving, joining and scanning need `pi/polkit/50-hamops-wifi.rules` (NetworkManager's `settings.modify.system`, `network-control` and `wifi.scan` for `hamops` only; the radio on/off stays blocked). Without the rule the tab still lists networks and says why it can't change them.
 - `GET /api/wifi` → `{"wifi": {"available", "can_change", "message", "permissions": {"scan", "modify", "control"}, "saved": [{"id", "ssid", "rank", "active", "in_range", "signal", "bars"}], "nearby": [{"ssid", "signal", "bars", "security", "open", "enterprise", "saved_id"}], "scanning", "scanned_at", "scan_error", "job": {"ssid", "state": "joining" | "joined" | "failed", "message"} | null}}`. Saved networks are Wi-Fi connections only, first choice first (NetworkManager's `autoconnect-priority`, higher first); `id` is the connection's UUID. Nearby is NetworkManager's last scan (reading it never starts one), one row per name, strongest first; networks with no name (hidden) are left out.

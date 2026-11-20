@@ -1,8 +1,9 @@
 """Field Mode lightning from NOAA's GOES Geostationary Lightning Mapper (GLM).
 
 Step 1 (2026-11-13): reading GLM files and working out what is near the operating site.
-Not yet wired into the service; the fetching loop, the on/off switch and the lightning
-block come next. Design agreed with Dan 2026-11-12 (see docs/contracts.md and the brief):
+Step 2 (2026-11-20): field_lightning.py fetches the files, keeps the on/off switch and
+builds the Field lightning block from these pieces. Design agreed with Dan 2026-11-12
+(see docs/contracts.md and the brief):
 
 - Source: NOAA's public GLM-L2-LCFA files on AWS (``noaa-goes19`` = GOES-East), one file
   per 20 seconds covering the satellite's whole view. Measured on the Pi: about 60 MB an
@@ -99,7 +100,7 @@ def compass(deg):
 
 
 def nearby(flashes, lat, lon, radius_mi=WATCH_RADIUS_MI):
-    """Flashes within radius_mi of the site -> [{time, distance_mi, bearing}], nearest first.
+    """Flashes within radius_mi of the site -> [{time, distance_mi, bearing, lat, lon}], nearest first.
 
     A cheap latitude/longitude box first, so a whole-hemisphere file costs little."""
     dlat = radius_mi / 69.0 + 0.1
@@ -110,7 +111,8 @@ def nearby(flashes, lat, lon, radius_mi=WATCH_RADIUS_MI):
             continue
         d = distance_mi(lat, lon, la, lo)
         if d <= radius_mi:
-            out.append({"time": t, "distance_mi": d, "bearing": compass(bearing_deg(lat, lon, la, lo))})
+            out.append({"time": t, "distance_mi": d, "bearing": compass(bearing_deg(lat, lon, la, lo)),
+                        "lat": la, "lon": lo})
     out.sort(key=lambda s: s["distance_mi"])
     return out
 
@@ -122,8 +124,9 @@ class Recent:
 
     add() the nearby flashes from each file read; summary(now) says what to show."""
 
-    def __init__(self, hold_min=HOLD_MIN):
+    def __init__(self, hold_min=HOLD_MIN, tiers_mi=TIERS_MI):
         self.hold = timedelta(minutes=hold_min)
+        self.tiers = tuple(sorted(tiers_mi))
         self.flashes = []
 
     def add(self, flashes):
@@ -131,12 +134,12 @@ class Recent:
 
     def summary(self, now):
         self.flashes = [f for f in self.flashes if now - f["time"] <= self.hold]
-        within = [f for f in self.flashes if f["distance_mi"] <= TIERS_MI[-1]]
+        within = [f for f in self.flashes if f["distance_mi"] <= self.tiers[-1]]
         if not within:
             return {"tier_mi": None, "closest_mi": None, "closest_bearing": None,
                     "last_time": None, "hold_until": None, "flashes_10_min": 0}
         closest = min(within, key=lambda f: f["distance_mi"])
-        tier = next(t for t in TIERS_MI if any(f["distance_mi"] <= t for f in within))
+        tier = next(t for t in self.tiers if any(f["distance_mi"] <= t for f in within))
         # Each tier holds until 30 minutes after the last flash inside it.
         last_in_tier = max(f["time"] for f in within if f["distance_mi"] <= tier)
         return {

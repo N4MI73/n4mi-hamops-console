@@ -366,5 +366,45 @@ class Endpoints(unittest.TestCase):
         self.assertEqual(self.client.get("/api/system").headers["Cache-Control"], "no-store")
 
 
+class LightningEndpoint(unittest.TestCase):
+    """POST /api/lightning (2026-11-20). The state file goes to a temporary folder."""
+
+    def setUp(self):
+        self._old = os.environ.get("HAMOPS_STATE_FIELD_LIGHTNING")
+        os.environ["HAMOPS_STATE_FIELD_LIGHTNING"] = os.path.join(tempfile.mkdtemp(), "fl.json")
+        self.settings = make_settings()
+        src = PropagationSource(self.settings, fetch=lambda base: PROPMON_SAMPLE, clock=Clock(T0))
+        self.client = create_app(self.settings, propagation=src, dashboard_dir=tempfile.mkdtemp()).test_client()
+
+    def tearDown(self):
+        if self._old is None:
+            os.environ.pop("HAMOPS_STATE_FIELD_LIGHTNING", None)
+        else:
+            os.environ["HAMOPS_STATE_FIELD_LIGHTNING"] = self._old
+
+    def post(self, body):
+        return self.client.post("/api/lightning", json=body)
+
+    def test_actions(self):
+        self.assertEqual(self.post({"action": "bogus"}).status_code, 400)
+        self.assertEqual(self.post(None).status_code, 400)
+        self.assertEqual(self.post({"action": "on"}).status_code, 409)       # Home Mode
+        self.assertEqual(self.post({"action": "keep_on"}).status_code, 409)
+        self.assertEqual(self.post({"action": "dismiss_recent"}).status_code, 409)
+        r = self.post({"action": "home_test_on"})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.get_json()["satellite_lightning"]["home_test"])
+        system = self.client.get("/api/system").get_json()
+        self.assertEqual(system["satellite_lightning"]["running"], "home_test")
+        self.post({"action": "home_test_off"})
+        self.settings["mode"] = "field"
+        r = self.post({"action": "on"})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.get_json()["detection"]["on"])
+        r = self.post({"action": "off"})
+        self.assertFalse(r.get_json()["detection"]["on"])
+        self.assertEqual(r.headers["Cache-Control"], "no-store")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

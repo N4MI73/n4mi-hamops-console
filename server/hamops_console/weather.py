@@ -19,8 +19,8 @@ Consumer rules agreed with Weather Sentinel (2026-10-12), all applied here:
 
 The NWS forecast (both modes) comes from forecast.py, and the NOAA Weather
 Radio block (both modes) from nwr.py. Field Mode's own NWS alerts and station
-observations come in a later step; until then, in Field Mode the alerts and
-conditions blocks say they aren't built yet.
+observations come from field_weather.py (2026-11-16), and its lightning from the
+GOES satellite, switched on by hand, from field_lightning.py (2026-11-20).
 
 The console's own lightning state -- the 5-mile hold and the operator's
 Clear -- is saved on the Pi (LightningState) so it survives a restart.
@@ -40,6 +40,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import alert_classes, freshness, grid as grid_mod, location as location_mod
+from .field_lightning import FieldLightning
 from .field_weather import FieldWeather
 from .forecast import ForecastSource
 from .nwr import NwrSource
@@ -209,12 +210,13 @@ class WeatherSource:
     """Keeps the last good Weather Sentinel reply and builds the weather blocks."""
 
     def __init__(self, settings, fetch=fetch_sentinel, clock=freshness.utcnow, forecast=None,
-                 lightning_state=None, nwr=None, field=None):
+                 lightning_state=None, nwr=None, field=None, field_lightning=None):
         self.settings = settings
         self.nwr = nwr or NwrSource(settings, clock=clock)
         self._state = lightning_state or LightningState()
         self.forecast = forecast or ForecastSource(settings, clock=clock)
         self.field = field or FieldWeather(settings, self.forecast, clock=clock)
+        self.field_lightning = field_lightning or FieldLightning(settings, clock=clock)
         self._fetch = fetch
         self._clock = clock
         self._lock = threading.Lock()
@@ -291,7 +293,10 @@ class WeatherSource:
     def clear_hold(self):
         """The operator's Clear: ends both lightning holds until the next strike.
         Sentinel's own 10-mile hold isn't touched; the console only stops
-        showing it. Returns the time of the clear."""
+        showing it. Returns the time of the clear. In Field Mode it clears the
+        satellite lightning holds instead."""
+        if self.settings["mode"] == "field":
+            return self.field_lightning.clear_hold()
         with self._lock:
             now = self._clock()
             st = self._state
@@ -417,8 +422,11 @@ class WeatherSource:
             alerts["items"] = sort_alerts(alerts["items"])
             location = self._location()
             apply_storm_alerts(forecast, alerts, now)
+            # The outlook rule (on until the NWS outlook clears) sees the outlook after storm
+            # alerts are applied, so a Severe Thunderstorm Watch keeps detection on.
+            self.field_lightning.observe(forecast, alerts.get("status"))
             return {"location": location, "alerts": alerts,
-                    "conditions": self.field.conditions_block(), "lightning": None,
+                    "conditions": self.field.conditions_block(), "lightning": self.field_lightning.block(),
                     "weather_radio": self._radio_block(location), "forecast": forecast}
         with self._lock:
             self._refresh_if_due(now)

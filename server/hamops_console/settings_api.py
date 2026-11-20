@@ -32,8 +32,8 @@ from . import field_day, forecast, grid as grid_mod, settings as settings_mod
 
 log = logging.getLogger(__name__)
 
-EDITABLE = ("mode", "station", "display", "profile", "field_day", "sources", "thresholds",
-            "nws_user_agent_contact")
+EDITABLE = ("mode", "station", "display", "profile", "field_day", "sources", "field_lightning",
+            "thresholds", "nws_user_agent_contact")
 
 # (low, high) for each numeric threshold; whole numbers unless listed in FLOATS.
 THRESHOLD_RANGES = {
@@ -46,8 +46,11 @@ THRESHOLD_RANGES = {
     "lightning_notify_mi": (1, 30), "lightning_high_mi": (1, 30), "lightning_hold_min": (5, 120),
     "lightning_frequent_per_min": (1, 60), "storms_forecast_hours": (1, 12),
     "prop_bad_k_index": (1, 9), "prop_good_min_bands": (1, 10),
+    "lightning_field_outer_mi": (5, 30), "glm_stale_min": (1, 30), "glm_auto_off_hours": (1, 24),
+    "glm_ask_first_min": (5, 240), "glm_ask_again_hours": (1, 12),
 }
-FLOATS = {"lightning_notify_mi", "lightning_high_mi"}
+FLOATS = {"lightning_notify_mi", "lightning_high_mi", "lightning_field_outer_mi"}
+SOURCE_URLS = ("propmon_url", "sentinel_url", "field_engine_url", "glm_east_url", "glm_west_url")
 XRAY_CLASSES = {"A", "B", "C", "M", "X"}
 CALLSIGN = re.compile(r"^[A-Z0-9/]{3,12}$")
 HHMM = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
@@ -174,10 +177,26 @@ def check(changes, current):
         else:
             for field, value in sources.items():
                 where = f"sources.{field}"
-                if field not in ("propmon_url", "sentinel_url", "field_engine_url"):
+                if field not in SOURCE_URLS:
                     errors.append(f"{where} isn't a source setting")
                 elif not isinstance(value, str) or (value and not _url_ok(value)):
                     errors.append(f"{where}: an address such as http://host:8076, or empty")
+
+    fl = changes.get("field_lightning")
+    if fl is not None:
+        if not isinstance(fl, dict):
+            errors.append("field_lightning must be an object")
+        else:
+            for field, value in fl.items():
+                where = f"field_lightning.{field}"
+                if field == "level":
+                    if value not in ("full", "economy"):
+                        errors.append(f"{where} must be 'full' or 'economy'")
+                elif field == "satellite":
+                    if value not in ("east", "west"):
+                        errors.append(f"{where} must be 'east' or 'west'")
+                else:
+                    errors.append(f"{where} isn't a lightning detection setting")
 
     thresholds = changes.get("thresholds")
     if thresholds is not None:
@@ -204,6 +223,16 @@ def check(changes, current):
                     and isinstance(merged.get("lightning_notify_mi"), (int, float))
                     and merged["lightning_high_mi"] > merged["lightning_notify_mi"]):
                 errors.append("thresholds: lightning_high_mi can't be more than lightning_notify_mi")
+            if (isinstance(merged.get("lightning_notify_mi"), (int, float))
+                    and isinstance(merged.get("lightning_field_outer_mi"), (int, float))
+                    and merged["lightning_notify_mi"] > merged["lightning_field_outer_mi"]):
+                errors.append("thresholds: lightning_notify_mi can't be more than lightning_field_outer_mi")
+            hours = merged.get("glm_auto_off_hours")
+            again, first = merged.get("glm_ask_again_hours"), merged.get("glm_ask_first_min")
+            if all(isinstance(v, (int, float)) for v in (hours, again, first)):
+                if not first < again * 60 < hours * 60:
+                    errors.append("thresholds: lightning detection must ask first, then again, "
+                                  "before it turns itself off (glm_ask_first_min < glm_ask_again_hours < glm_auto_off_hours)")
 
     if "nws_user_agent_contact" in changes:
         value = changes["nws_user_agent_contact"]

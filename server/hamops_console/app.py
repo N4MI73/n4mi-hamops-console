@@ -23,6 +23,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from . import __version__, alerts as alerts_mod, field_day, freshness, location, power, settings as settings_mod, settings_api, system_info
 from .display import Display
 from .engine_check import EngineCheck
+from .field_lightning import FieldLightning
 from .gps import GpsSource
 from .field_propagation import FieldPropagationSource, ModePropagation
 from .propagation import PropagationSource
@@ -50,10 +51,13 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
     # GPS (Phase 4): sets the Field grid when the Field station's grid source is GPS.
     gps = GpsSource() if gps is None else gps
     location.use_gps(gps)
+    # Field Mode lightning from the GOES satellite (2026-11-20)
+    lightning = getattr(weather, "field_lightning", None) or FieldLightning(settings)
     started_at = freshness.utcnow()
     app = Flask(__name__, static_folder=None)
     app.extensions["hamops_display"] = display     # __main__ starts its day/night check
     app.extensions["hamops_gps"] = gps             # __main__ starts its gpsd reader
+    app.extensions["hamops_lightning"] = lightning # __main__ starts its satellite loop
 
     @app.after_request
     def revalidate(response):
@@ -146,10 +150,37 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
         """The operator's Clear for the lightning holds, until the next strike.
         Allowed only while a lightning item is in the list; the dashboard asks
         for confirmation first. Nothing is sent to Weather Sentinel."""
-        lightning = {"lightning_5mi", "lightning_frequent", "lightning_10mi"}
-        if not any(i["category"] in lightning for i in ranked()):
+        if not any(i["category"] in alerts_mod.LIGHTNING_HOLDS for i in ranked()):
             return jsonify({"error": "No lightning hold to clear"}), 409
         return jsonify({"cleared_at": freshness.iso(weather.clear_hold())})
+
+    @app.post("/api/lightning")
+    def api_lightning():
+        """Field Mode lightning detection (GOES satellite, 2026-11-20):
+        {"action": "on" | "off" | "keep_on" | "dismiss_recent" | "home_test_on" | "home_test_off"}.
+        on/off: the switch (on is for Field Mode). keep_on: the answer to "keep it on?".
+        dismiss_recent: the "turned off with lightning recent" card. home_test_*: the at-home
+        comparison with the Tempest (Home Mode; results on the System page only)."""
+        body = request.get_json(silent=True)
+        action = body.get("action") if isinstance(body, dict) else None
+        if action == "on":
+            if settings["mode"] != "field":
+                return nocache({"error": "Lightning detection is for Field Mode (use home_test_on at home)"}, 409)
+            return nocache({"detection": lightning.turn_on()})
+        if action == "off":
+            return nocache({"detection": lightning.turn_off("operator")})
+        if action == "keep_on":
+            if not lightning.keep_on():
+                return nocache({"error": "No question waiting"}, 409)
+            return nocache({"detection": lightning.detection()})
+        if action == "dismiss_recent":
+            if not lightning.dismiss_recent():
+                return nocache({"error": "Nothing to dismiss"}, 409)
+            return nocache({"detection": lightning.detection()})
+        if action in ("home_test_on", "home_test_off"):
+            return nocache({"satellite_lightning": lightning.set_home_test(action == "home_test_on")})
+        return nocache({"error": "send {\"action\": \"on\" | \"off\" | \"keep_on\" | \"dismiss_recent\" | "
+                                 "\"home_test_on\" | \"home_test_off\"}"}, 400)
 
     @app.post("/api/weather-radio/refresh")
     def api_weather_radio_refresh():
@@ -186,7 +217,7 @@ def create_app(settings=None, propagation=None, weather=None, acks=None, ended=N
     @app.get("/api/system")
     def api_system():
         return envelope(system=system_info.block(__version__, started_at), display=display.block(),
-                        field_day=field_day.block(settings))
+                        field_day=field_day.block(settings), satellite_lightning=lightning.system_block())
 
     @app.get("/api/gps")
     def api_gps():

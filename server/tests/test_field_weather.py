@@ -20,6 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 from hamops_console import field_weather, freshness, settings as settings_mod  # noqa: E402
+from hamops_console.field_lightning import FieldLightning  # noqa: E402
 from hamops_console.field_weather import FieldWeather  # noqa: E402
 
 with open(os.path.join(HERE, "data", "nws_field_samples.json"), encoding="utf-8") as f:
@@ -296,10 +297,12 @@ class InWeatherSource(unittest.TestCase):
             lightning_state=LightningState(os.path.join(tempfile.mkdtemp(), "l.json")),
             nwr=NwrSource(settings, fetch=offline, clock=clock, run=lambda job: job(),
                           path=os.path.join(tempfile.mkdtemp(), "nwr.json")),
-            field=FieldWeather(settings, FakeForecast(), fetch=nws, clock=clock, run=lambda job: job()))
+            field=FieldWeather(settings, FakeForecast(), fetch=nws, clock=clock, run=lambda job: job()),
+            field_lightning=FieldLightning(settings, clock=clock,
+                                           state_path=os.path.join(tempfile.mkdtemp(), "fl.json")))
         w = source.blocks()
         self.assertEqual(sentinel_calls, [])
-        self.assertIsNone(w["lightning"])
+        self.assertEqual(w["lightning"]["status"], "off")      # satellite detection, off until switched on
         self.assertEqual([i["event"] for i in w["alerts"]["items"]], ["Winter Storm Watch", "Wind Advisory"])
         self.assertEqual(w["alerts"]["source"], "NWS")
 

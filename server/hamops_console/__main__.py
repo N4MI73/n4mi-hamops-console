@@ -20,6 +20,7 @@ def main():
     app = create_app(settings)
     app.extensions["hamops_display"].start()   # screen brightness by day and night
     app.extensions["hamops_gps"].start()       # GPS reports from gpsd (Field grid, time check)
+    app.extensions["hamops_lightning"].start() # GOES satellite lightning (idle until switched on)
     server = settings["server"]
     logging.getLogger("hamops_console").info(
         "listening on http://%s:%s/", server["host"], server["port"])

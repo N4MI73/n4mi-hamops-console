@@ -44,6 +44,16 @@ DEFAULTS = {
         # Ham Shack Automation's published field engine model, read only to compare
         # versions ("Field engine out of date"); never downloaded into use (2026-11-17).
         "field_engine_url": "https://raw.githubusercontent.com/N4MI73/n4mi-shack-server/main/field-engine/rating_model.json",
+        # NOAA's public GOES lightning (GLM) buckets, for Field Mode lightning (2026-11-20).
+        # When NOAA moves a satellite (GOES-19 became GOES-East in 2025), change the address.
+        "glm_east_url": "https://noaa-goes19.s3.amazonaws.com",
+        "glm_west_url": "https://noaa-goes18.s3.amazonaws.com",
+    },
+    # Field Mode lightning from the GOES satellite (2026-11-20). On and off is not a
+    # setting: it is switched on the screens and saved in the console's state.
+    "field_lightning": {
+        "level": "full",              # "full" (every 20-s file, ~60 MB/h) or "economy" (one a minute, ~20 MB/h)
+        "satellite": "east",          # "east" or "west"
     },
     "thresholds": {
         "propagation_stale_min": 15,
@@ -63,6 +73,11 @@ DEFAULTS = {
         "lightning_high_mi": 5,
         "lightning_hold_min": 30,
         "lightning_frequent_per_min": 5,
+        "lightning_field_outer_mi": 20,     # Field: the amber "within 20 mi" notification (2026-11-12)
+        "glm_stale_min": 3,                 # Field: satellite data late after this long without a new file
+        "glm_auto_off_hours": 6,            # Field: turned on with no NWS outlook -> off after this long
+        "glm_ask_first_min": 30,            # ... asking "keep it on?" after this long
+        "glm_ask_again_hours": 3,           # ... and once more at this point after Keep on
         "storms_forecast_hours": 6,
         "prop_bad_k_index": 5,
         "prop_bad_xray_classes": ["M", "X"],

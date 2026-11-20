@@ -17,8 +17,11 @@
   "field_day": {"ops_start": null, "ops_end": null},
   "sources": {
     "propmon_url": "http://<propmon-host>:8076",
-    "sentinel_url": "http://<sentinel-host>:8085"
+    "sentinel_url": "http://<sentinel-host>:8085",
+    "glm_east_url": "https://noaa-goes19.s3.amazonaws.com",
+    "glm_west_url": "https://noaa-goes18.s3.amazonaws.com"
   },
+  "field_lightning": {"level": "full", "satellite": "east"},
   "server": {"host": "127.0.0.1", "port": 8090},
   "thresholds": {
     "propagation_fetch_min": 5,
@@ -35,6 +38,11 @@
     "lightning_high_mi": 5,
     "lightning_hold_min": 30,
     "lightning_frequent_per_min": 5,
+    "lightning_field_outer_mi": 20,
+    "glm_stale_min": 3,
+    "glm_auto_off_hours": 6,
+    "glm_ask_first_min": 30,
+    "glm_ask_again_hours": 3,
     "storms_forecast_hours": 6,
     "prop_bad_k_index": 5,
     "prop_bad_xray_classes": ["M", "X"],

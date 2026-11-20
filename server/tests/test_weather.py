@@ -24,6 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 from hamops_console import alert_classes, freshness, settings as settings_mod  # noqa: E402
+from hamops_console.field_lightning import FieldLightning  # noqa: E402
 from hamops_console.forecast import ForecastSource  # noqa: E402
 from hamops_console.nwr import NwrSource  # noqa: E402
 from hamops_console.weather import LightningState, WeatherSource  # noqa: E402
@@ -125,8 +126,9 @@ def make(reply, now, mode="home", state_path=None):
     state = LightningState(state_path or os.path.join(tempfile.mkdtemp(), "lightning.json"))
     no_nwr = NwrSource(settings, fetch=StandIn(urllib.error.URLError("offline")), clock=clock,
                        run=lambda job: job(), path=os.path.join(tempfile.mkdtemp(), "nwr.json"))
+    sat = FieldLightning(settings, clock=clock, state_path=os.path.join(tempfile.mkdtemp(), "fl.json"))
     return (WeatherSource(settings, fetch=stand_in, clock=clock, forecast=no_nws, lightning_state=state,
-                          nwr=no_nwr),
+                          nwr=no_nwr, field_lightning=sat),
             stand_in, clock)
 
 
@@ -477,7 +479,7 @@ class FieldMode(unittest.TestCase):
         w = source.blocks()
         self.assertEqual(w["alerts"]["status"], "unavailable")
         self.assertEqual(w["alerts"]["items"], [])
-        self.assertIsNone(w["lightning"])
+        self.assertEqual(w["lightning"]["status"], "off")      # satellite detection, off until switched on
         self.assertEqual(stand_in.calls, 0)  # never asks the home station in Field Mode
 
 

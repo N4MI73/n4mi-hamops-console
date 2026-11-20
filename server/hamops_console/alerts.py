@@ -13,18 +13,25 @@ find_worst_alert() lesson). Order approved 2026-10-12, extended by Dan
      5 lightning_likely_soon     lightning likely within 2 h          yellow
      6 lightning_frequent        > 5 strikes a minute inside 10 mi    yellow
      7 lightning_10mi            strike inside 10 mi                  yellow
-     8 lightning_outlook         lightning possible, or likely later  yellow
-     9 source_down               a source stale, unavailable or in test mode           yellow
+     8 lightning_20mi            Field: a flash inside 20 mi          yellow   (2026-11-20)
+     9 lightning_off_recent      Field: detection turned off with flashes inside 20 mi
+                                 in the last 30 minutes ("not an all-clear")   yellow
+    10 lightning_outlook         lightning possible, or likely later  yellow
+    11 source_down               a source stale, unavailable or in test mode           yellow
                                  (NWS alerts first among these, 2026-11-05)
-    10 propagation               notable propagation                  green (good) / yellow (bad)
-    11 all_quiet                 nothing else on the card             green
+    12 propagation               notable propagation                  green (good) / yellow (bad)
+    13 all_quiet                 nothing else on the card             green
   badge tier (counted on the Alerts button)
      - temperature_alert         heat/cold product                    yellow
      - other_warning             other NWS warning                    blue
      - other_notice              other NWS advisory or statement      blue
 
-One detected-lightning item at a time (5 mi beats frequent beats 10 mi), and
-one forecast-lightning item; one of each can show together. Within a
+One detected-lightning item at a time (5 mi beats frequent beats 10 mi beats
+20 mi), and one forecast-lightning item; one of each can show together. Field
+Mode lightning (GOES satellite) is used while its block is ok or stale: a flash
+already seen keeps its hold when newer data is late, beside a "lightning data
+late" card. While Field detection is off, the forecast-lightning item carries
+`"action": "lightning_on"` for the Turn on button. Within a
 category the newest comes first. The list is never empty.
 
 Acknowledge is the console's own, stored on the Pi by AckStore, keyed by
@@ -55,7 +62,8 @@ ACK_KEEP_HOURS = 48
 ENDED_KEEP_HOURS = 24
 
 ORDER = ["hazard_warning", "lightning_5mi", "alerts_unavailable_storms", "hazard_alert",
-         "lightning_likely_soon", "lightning_frequent", "lightning_10mi", "lightning_outlook",
+         "lightning_likely_soon", "lightning_frequent", "lightning_10mi", "lightning_20mi",
+         "lightning_off_recent", "lightning_outlook",
          "source_down", "propagation", "all_quiet",
          "temperature_alert", "other_warning", "other_notice"]
 BADGE = {"temperature_alert", "other_warning", "other_notice"}
@@ -124,7 +132,67 @@ def _nws_items(alerts):
     return out
 
 
+GOES = "GOES satellite"
+LIGHTNING_HOLDS = {"lightning_5mi", "lightning_frequent", "lightning_10mi", "lightning_20mi"}
+
+
+def _field_lightning(lightning):
+    """Field Mode, from the GOES satellite block (2026-11-20). Used whatever the freshness
+    while detection is on: the block sets a tier only from flashes actually seen, and a
+    hold from a flash already seen stands even when newer files are late or missing."""
+    if lightning.get("status") == "off":
+        return []
+    closest, bearing = lightning.get("closest_mi"), lightning.get("closest_bearing")
+    where = (f"{closest:g} mi {bearing}" if isinstance(closest, (int, float)) and bearing
+             else f"{closest:g} mi" if isinstance(closest, (int, float)) else "nearby")
+    count = lightning.get("strikes_recent")
+    flashes = (f"{count} flash{'' if count == 1 else 'es'} in the last {lightning.get('window_min')} min."
+               if count else "")
+    last = freshness.parse_time(lightning.get("last_strike_at"))
+    at = f"Last at {clock_text(last)}." if last else ""
+    source = "GOES satellite · check your lightning app."
+    if lightning.get("within_5mi"):
+        until = freshness.parse_time(lightning.get("hold_until_5mi"))
+        stay = f"Stay in until {clock_text(until)}." if until else ""
+        since = lightning.get("hold_since_5mi")
+        return [_item("lightning_5mi", f"Lightning {where}", _join(flashes, stay, source), since,
+                      "weather.lightning", f"lightning-5mi-{since}", "red")]
+    if lightning.get("frequent"):
+        return [_item("lightning_frequent", "Frequent lightning inside 10 mi",
+                      _join(f"Closest {where}.", flashes, source),
+                      lightning.get("last_strike_at"), "weather.lightning", "lightning-frequent", "yellow")]
+    if lightning.get("within_10mi"):
+        until = freshness.parse_time(lightning.get("hold_until_10mi"))
+        wait = f"Wait until {clock_text(until)}." if until else ""
+        return [_item("lightning_10mi", f"Lightning {where}", _join(flashes, wait, source),
+                      lightning.get("last_strike_at"), "weather.lightning", "lightning-10mi", "yellow")]
+    if lightning.get("within_20mi"):
+        seen = f"{where} at {clock_text(last)}." if last and where != "nearby" else at
+        return [_item("lightning_20mi", "Lightning within 20 mi", _join(seen, flashes, source),
+                      lightning.get("last_strike_at"), "weather.lightning", "lightning-20mi", "yellow")]
+    return []
+
+
+def _lightning_off_recent(lightning):
+    """Field detection turned off while flashes were inside 20 mi in the last 30 minutes."""
+    recent = ((lightning or {}).get("detection") or {}).get("recent_at_off")
+    if not recent:
+        return []
+    last = freshness.parse_time(recent.get("last_strike_at"))
+    title = f"Lightning detection off · strikes within 20 mi at {clock_text(last)}" if last else \
+        "Lightning detection off · strikes within 20 mi"
+    item = _item("lightning_off_recent", title,
+                 "This is not an all-clear. Turn lightning detection back on to keep watching.",
+                 recent.get("last_strike_at"), "weather.lightning", f"lightning-off-recent-{recent.get('last_strike_at')}",
+                 "yellow")
+    item["action"] = "lightning_on"
+    item["until"] = recent.get("until")
+    return [item]
+
+
 def _detected_lightning(lightning):
+    if lightning and lightning.get("source") == GOES:
+        return _field_lightning(lightning)
     if not lightning or lightning.get("status") != freshness.OK:
         return []
     closest = lightning.get("closest_mi")
@@ -150,7 +218,7 @@ def _detected_lightning(lightning):
     return []
 
 
-def _forecast_lightning(forecast, now):
+def _forecast_lightning(forecast, now, lightning=None):
     outlook = (forecast or {}).get("lightning_outlook")
     if not outlook:
         return []
@@ -160,8 +228,11 @@ def _forecast_lightning(forecast, now):
     when = "now" if start is None or start <= now else f"after {clock_text(start)}"
     soon = level == "likely" and (start is None or start - now <= timedelta(hours=LIKELY_SOON_HOURS))
     category = "lightning_likely_soon" if soon else "lightning_outlook"
-    return [_item(category, f"Lightning {level} {when}", f"{basis}, not detected.",
-                  outlook.get("start"), "weather.forecast", f"lightning-outlook-{level}", "yellow")]
+    item = _item(category, f"Lightning {level} {when}", f"{basis}, not detected.",
+                 outlook.get("start"), "weather.forecast", f"lightning-outlook-{level}", "yellow")
+    if lightning and lightning.get("source") == GOES and lightning.get("status") == "off":
+        item["action"] = "lightning_on"      # Field: the Turn on lightning detection button (board A)
+    return [item]
 
 
 def _alerts_unavailable_storms(alerts, forecast, now, hours, tune):
@@ -188,14 +259,20 @@ def _source_down(blocks, tune="Tune NOAA Weather Radio."):
     source fold into it, as before, so one outage still gives one card."""
     by_source = {}
     for name, block in blocks:
-        if not block or block.get("status") == freshness.OK:
+        if not block or block.get("status") in (freshness.OK, "off"):
             continue
+        if (block.get("detection") or {}).get("starting"):
+            continue              # just turned on: the first satellite file is on its way
         by_source.setdefault(block.get("source") or name, (name, block))
     out = []
     for source, (name, block) in by_source.items():
         status, message, id_ = block["status"], block.get("message"), f"source-{source}"
         if status == freshness.TEST:
             title = "Home weather station in test mode"
+        elif source == GOES:
+            title = "Lightning data late" if status == freshness.STALE else "Lightning data unavailable"
+            message = _join(message + "." if message and not message.endswith(".") else message,
+                            "Not the same as no lightning.")
         elif name == "weather.alerts":
             title = "NWS alerts out of date" if status == freshness.STALE else "NWS alerts unavailable"
             message = _join(message + "." if message and not message.endswith(".") else message,
@@ -251,7 +328,8 @@ def _build(propagation, weather, settings, now, acks=None):
     items = []
     items += _nws_items(alerts)
     items += _detected_lightning(weather.get("lightning"))
-    items += _forecast_lightning(forecast, now)
+    items += _lightning_off_recent(weather.get("lightning"))
+    items += _forecast_lightning(forecast, now, weather.get("lightning"))
     # NWS alerts not current: name the weather radio station to tune (contract section 5).
     tune = tune_words(weather.get("weather_radio"))
     items += _alerts_unavailable_storms(alerts, forecast, now, t["storms_forecast_hours"], tune)

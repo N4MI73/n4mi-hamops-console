@@ -41,7 +41,8 @@ Every data block carries the same freshness fields (`status`: ok / stale / unava
 | `field_day.py` | The Field Day profile's timer: works out when setup starts (local midnight on the operations day) for the status-bar pill (2026-11-12) |
 | `gps.py` | GPS as a location source (Phase 4, 2026-11-18): reads gpsd on the Pi, keeps the fix and satellites, accepts a new 6-character grid after 2 minutes in the same subsquare (saved in `~/.local/state/hamops-console/gps.json`), and compares GPS time with the Pi's clock (never sets it); `details()` feeds the GPS details panel (`GET /api/gps`) |
 | `location.py` | The grid each data source uses: the typed grid, or the GPS grid for the Field station when its grid source is GPS (2026-11-18) |
-| `glm.py` | Field Mode lightning from NOAA's GOES satellite lightning mapper: reads GLM files, finds flashes near the site, applies the 20/10/5-mile tiers and the 30-minute clear. **Not yet wired into the service** (step 1, 2026-11-13). Needs `python3-netcdf4` to read files |
+| `glm.py` | Field Mode lightning from NOAA's GOES satellite lightning mapper: reads GLM files, finds flashes near the site, applies the 20/10/5-mile tiers and the 30-minute clear (step 1, 2026-11-13). Needs `python3-netcdf4` to read files |
+| `field_lightning.py` | Field Mode lightning, step 2 (2026-11-20): the on/off switch (turned on by hand; off when the NWS outlook clears, or after 6 h with no outlook, asking "keep it on?" at 30 min and 3 h; an automatic turn-off waits while lightning is within 20 mi), a background loop fetching new GLM files from NOAA's bucket (Full: every file, Economy: one a minute), the Field `lightning` block, the data counter and the at-home test. Saved in `~/.local/state/hamops-console/field_lightning.json`. Idle and downloading nothing while off |
 | `nws_text.py` | Short "what" and "hazard" lines from NWS alert text (ported from Weather Sentinel) |
 | `app.py`, `__main__.py` | The Flask app and its start-up |
 
@@ -71,7 +72,8 @@ python3 server/tests/test_nwr.py
 python3 server/tests/test_display.py
 python3 server/tests/test_field_day.py
 python3 server/tests/test_glm.py
+python3 server/tests/test_field_lightning.py
 python3 server/tests/test_gps.py
 ```
 
-`test_glm.py` skips its file-reading tests when `python3-netcdf4` isn't installed. A real GLM file put in `server/data/glm/` (ignored by git) is read too.
+`test_glm.py` skips its file-reading tests when `python3-netcdf4` isn't installed. A real GLM file put in `server/data/glm/` (ignored by git) is read too. `test_field_lightning.py` uses a stand-in bucket and reader, so it needs neither the network nor `python3-netcdf4`.
