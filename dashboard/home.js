@@ -28,6 +28,13 @@ const LABELS = {
   lightning_10mi: "LIGHTNING DETECTED · HOME TEMPEST", lightning_outlook: "LIGHTNING FORECAST",
   source_down: "DATA SOURCE", propagation: "PROPAGATION", all_quiet: "RIGHT NOW",
 };
+// Field Mode lightning comes from the GOES satellite (2026-11-20), not the home Tempest.
+const SAT_LABELS = {
+  lightning_5mi: "LIGHTNING DETECTED · GOES SATELLITE", lightning_frequent: "LIGHTNING DETECTED · GOES SATELLITE",
+  lightning_10mi: "LIGHTNING DETECTED · GOES SATELLITE", lightning_20mi: "LIGHTNING DETECTED · GOES SATELLITE",
+  lightning_off_recent: "LIGHTNING DETECTION OFF",
+};
+const HOLD_CATEGORIES = new Set(["lightning_5mi", "lightning_frequent", "lightning_10mi", "lightning_20mi"]);
 
 function cardItems() {
   const a = state.data.alerts;
@@ -68,7 +75,8 @@ function renderPriority() {
   const quiet = item.category === "all_quiet";
   card.className = "priority " + (item.color || "green") + (flashing ? " flash" : "")
     + (!quiet && item.detail ? " has-detail" : "");
-  let label = LABELS[item.category] || "RIGHT NOW";
+  const sat = satLightning();
+  let label = (sat && SAT_LABELS[item.category]) || LABELS[item.category] || "RIGHT NOW";
   if (item.category === "hazard_alert") label = "NWS · WATCH OR ADVISORY";
   if (item.critical) label = "CRITICAL · " + label;
   if (item.acknowledged) label += " · ACKNOWLEDGED";
@@ -85,18 +93,29 @@ function renderPriority() {
     $("p-title").textContent = item.title;
     detail.hidden = !item.detail;
     detail.textContent = item.detail || "";
-    $("p-aside").textContent = "";
+    // Field lightning seen by the satellite: say detection is on, and at what level (board B).
+    const d = sat && sat.detection;
+    $("p-aside").textContent = d && d.on && HOLD_CATEGORIES.has(item.category)
+      ? `Detection on · ${d.level === "economy" ? "Economy" : "Full"}` : "";
   }
 
   const ack = $("p-ack");
   ack.hidden = !(item.critical && !item.acknowledged);
   ack.dataset.id = item.ref.id;
   const clear = $("p-clear");
-  const lightning = item.ref.block === "weather.lightning";
+  const lightning = HOLD_CATEGORIES.has(item.category);
   clear.hidden = !lightning;
   if (!lightning || t - state.clearArmed > 10000) state.clearArmed = 0;
   clear.textContent = state.clearArmed ? "Confirm clear" : "Clear hold";
   clear.classList.toggle("armed", !!state.clearArmed);
+
+  // Field: Turn on lightning detection on the forecast card while it is off (board A),
+  // and "back on" plus Dismiss on the turned-off-with-strikes-recent card (board D).
+  const turnOn = $("p-turnon");
+  turnOn.hidden = item.action !== "lightning_on";
+  turnOn.textContent = item.category === "lightning_off_recent" ? "Turn lightning detection back on"
+    : "Turn on lightning detection";
+  $("p-dismiss").hidden = item.category !== "lightning_off_recent";
 
   $("pager").hidden = cards.length < 2;
   $("p-count").textContent = `${state.index + 1} of ${cards.length}`;
@@ -109,7 +128,10 @@ function quietAside() {
   const p = (state.data.propagation || {}).propagation || {};
   const parts = [];
   if (w.alerts && w.alerts.status === "ok") parts.push("No NWS alerts");
-  if (w.lightning && w.lightning.status === "ok" && w.lightning.within_10mi === false) parts.push("no lightning");
+  const sat = satLightning();
+  const quietSat = sat && sat.detection && sat.detection.on && !sat.detection.starting;
+  if (sat ? quietSat && sat.status === "ok" && sat.within_20mi === false
+          : w.lightning && w.lightning.status === "ok" && w.lightning.within_10mi === false) parts.push("no lightning");
   const line2 = (p.status === "ok") ? `K ${dash(p.k_index)} · SFI ${dash(p.sfi)}` : "";
   return parts.join(" · ") + (line2 ? (parts.length ? " · " : "") + line2 : "");
 }
@@ -184,7 +206,8 @@ function renderLightningLine(l, fc) {
   const outlookWords = outlook
     ? `${outlook.level} ${new Date(outlook.start) <= new Date() ? "now" : "after " + mainTime(new Date(outlook.start))} (forecast)`
     : "none forecast";
-  if (!l) {                                  // Field Mode: no Tempest, forecast only
+  if (l && l.source === "GOES satellite") { renderSatLine(l, outlook, outlookWords); return; }
+  if (!l) {                                  // no lightning block: the forecast only
     setDot(dot, outlook ? "fair" : (fc && fc.status === "ok" ? "good" : ""));
     text.textContent = `Lightning: ${outlookWords}`;
     return;
@@ -206,6 +229,42 @@ function renderLightningLine(l, fc) {
     const cleared = l.cleared_at ? ` · cleared ${mainTime(new Date(l.cleared_at))}` : "";
     text.textContent = `No lightning nearby · ${outlookWords}${cleared}${stale}`;
   }
+}
+
+/* Field Mode: the GOES satellite (2026-11-20). Never an all-clear while off or without data. */
+function renderSatLine(l, outlook, outlookWords) {
+  const dot = $("lt-dot"), text = $("lt-text");
+  const d = l.detection || {};
+  const where = l.closest_mi != null ? `${l.closest_mi} mi${l.closest_bearing ? " " + l.closest_bearing : ""}` : "";
+  const late = l.status === "stale" || l.status === "unavailable" ? " (LATE)" : "";
+  if (l.status === "off") {
+    const recent = d.recent_at_off;
+    if (recent) {
+      setDot(dot, "fair");
+      text.textContent = `Detection off · strikes within 20 mi${recent.last_strike_at ? " at " + mainTime(new Date(recent.last_strike_at)) : ""}`;
+    } else {
+      const fcGone = !state.data.weather || !state.data.weather.forecast || state.data.weather.forecast.status === "unavailable";
+      setDot(dot, outlook || fcGone ? "fair" : "off");
+      text.textContent = fcGone && !outlook ? "Lightning detection off · forecast unavailable" : outlook
+        ? `Lightning detection off · NWS: ${outlook.level} ${new Date(outlook.start) <= new Date() ? "now" : "after " + mainTime(new Date(outlook.start))}`
+        : "Lightning detection off · none forecast";
+    }
+    return;
+  }
+  if (l.within_5mi) { setDot(dot, "bad"); text.textContent = `Lightning ${where} · ${dash(l.strikes_recent)} in ${dash(l.window_min)} min${late}`; return; }
+  if (l.within_10mi) { setDot(dot, "fair"); text.textContent = `Lightning ${where} · within 10 mi${late}`; return; }
+  if (l.within_20mi) { setDot(dot, "fair"); text.textContent = `Lightning ${where} · within 20 mi${late}`; return; }
+  if (d.starting) { setDot(dot, "off"); text.textContent = "Lightning detection starting…"; return; }
+  if (l.status !== "ok") {
+    setDot(dot, "bad");
+    text.textContent = l.status === "stale" ? "Satellite data late · not the same as no lightning"
+      : "Lightning detection: no satellite data";
+    return;
+  }
+  if (l.within_20mi !== false) { setDot(dot, "fair"); text.textContent = "Lightning detection: no answer yet"; return; }
+  const fcGone = !state.data.weather || !state.data.weather.forecast || state.data.weather.forecast.status === "unavailable";
+  setDot(dot, outlook || fcGone ? "fair" : "good");
+  text.textContent = `No lightning within 20 mi${d.level === "economy" ? " (sampled)" : ""} · ${fcGone ? "forecast unavailable" : outlookWords}`;
 }
 
 function renderNwsLine(a) {
@@ -258,6 +317,8 @@ function renderSystem() {
     rows.push(["Weather Sentinel", w.conditions]);
   }
   rows.push(["NWS forecast", w.forecast]);
+  const sat = satLightning();
+  if (sat && sat.status !== "off") rows.push(["GOES satellite", sat]);
   $("sources").replaceChildren(...rows.map(([name, block]) => {
     const row = document.createElement("div"); row.className = "line";
     const d = document.createElement("span"); setDot(d, freshText(block).dot);
@@ -303,6 +364,14 @@ $("p-clear").addEventListener("click", async e => {
   e.target.disabled = true;
   try { await fetch("/api/alerts/clear-hold", {method: "POST"}); }
   finally { e.target.disabled = false; poll(); }
+});
+$("p-turnon").addEventListener("click", async e => {
+  e.target.disabled = true;
+  try { await lightningAction("on"); } finally { e.target.disabled = false; }
+});
+$("p-dismiss").addEventListener("click", async e => {
+  e.target.disabled = true;
+  try { await lightningAction("dismiss_recent"); } finally { e.target.disabled = false; }
 });
 function touched() { state.lastTouch = Date.now(); state.clearArmed = 0; renderPriority(); }
 

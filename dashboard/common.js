@@ -457,6 +457,96 @@ function openShutdown() {
   document.body.append(box);
 }
 
+// ----------------------------------------------------------------- satellite lightning (2026-11-20)
+
+/* Field Mode lightning detection (GOES satellite): the switch, shared by the Home card,
+   the Weather page and Settings. POST /api/lightning, then a fresh poll. */
+async function lightningAction(action) {
+  let ok = false;
+  try {
+    const r = await fetch("/api/lightning", {method: "POST", headers: {"Content-Type": "application/json"},
+                                             body: JSON.stringify({action})});
+    ok = r.ok;
+  } catch (e) { /* the service is restarting or down: the next poll shows the real state */ }
+  poll();
+  return ok;            // never throws, so no button is left disabled
+}
+function satLightning() {               // the Field lightning block, or null at home
+  const l = (state.data.weather || {}).lightning;
+  return l && l.source === "GOES satellite" ? l : null;
+}
+const SAT_MB_HOUR = {full: 60, economy: 20};
+
+/* The keep-on question (Dan, 2026-11-20): 30 minutes after a hand turn-on with no NWS
+   lightning outlook, and once more at 3 hours after Keep on. It sits below the Priority
+   Card, so the card stays in view; it never appears while a critical alert is
+   unacknowledged (it waits for that alert to be acknowledged or end). Shown on the Home
+   screen only, so it never covers the Weather page's lightning row or the Alerts list;
+   detail pages return Home after 3 minutes untouched. No answer: detection stays on,
+   and turns itself off at the 6-hour limit. */
+let keepOnBox = null, keepOnStage = null;
+function renderKeepOn() {
+  const l = satLightning();
+  const q = l && l.detection && l.detection.on ? l.detection.question : null;
+  const blocked = alertItems().some(i => i.critical && !i.acknowledged);
+  if (!q || blocked || PAGE !== "home") {
+    if (keepOnBox) { keepOnBox.remove(); keepOnBox = keepOnStage = null; }
+    return;
+  }
+  if (keepOnBox && keepOnStage === q.stage) { placeKeepOn(); return; }
+  if (keepOnBox) keepOnBox.remove();
+  const d = l.detection;
+  const off = d.auto_off_at ? mainTime(new Date(d.auto_off_at)) : null;
+  const box = document.createElement("div");
+  box.className = "ko-overlay";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  const panel = document.createElement("div");
+  panel.className = "ko-panel";
+  const head = document.createElement("div");
+  head.className = "ko-head";
+  head.textContent = "LIGHTNING DETECTION · GOES SATELLITE";
+  const title = document.createElement("div");
+  title.className = "ko-title";
+  title.textContent = q.stage === "3h"
+    ? "Lightning detection has been on for 3 hours with no storms forecast. Keep it on?"
+    : "Lightning detection has been on for 30 min with no storms forecast. Keep it on?";
+  const note = document.createElement("div");
+  note.className = "ko-note";
+  const level = d.level === "economy" ? "Economy" : "Full";
+  note.textContent = `${level} · about ${SAT_MB_HOUR[d.level] || 60} MB an hour. `
+    + (q.stage === "3h"
+      ? `If kept on, it turns itself off at ${off || "the 6-hour limit"}.`
+      : `If nobody answers, it stays on${off ? ` and turns itself off at ${off}` : ""}.`);
+  const row = document.createElement("div");
+  row.className = "ko-buttons";
+  const button = (text, cls, action) => {
+    const b = document.createElement("button");
+    b.className = cls;
+    b.textContent = text;
+    b.addEventListener("click", async () => {
+      for (const x of row.querySelectorAll("button")) x.disabled = true;
+      // Always taken down: if the answer didn't reach the service, the next poll
+      // brings the question back with live buttons.
+      box.remove(); keepOnBox = keepOnStage = null;
+      await lightningAction(action);
+    });
+    row.append(b);
+  };
+  button("Keep on", "ko-keep", "keep_on");
+  button("Turn off", "ko-off", "off");
+  panel.append(head, title, note, row);
+  box.append(panel);
+  document.body.append(box);
+  keepOnBox = box; keepOnStage = q.stage;
+  placeKeepOn();
+}
+/* Below the Priority Card, measured each poll in case the card's height changes. */
+function placeKeepOn() {
+  const above = $("priority");
+  if (keepOnBox && above) keepOnBox.style.top = `${Math.round(above.getBoundingClientRect().bottom) + 6}px`;
+}
+
 // ----------------------------------------------------------------- GPS details (2026-11-18)
 
 /* Approved mockup "GPS details" (Dan, 2026-11-18): opened by tapping the GPS light on any
@@ -681,6 +771,7 @@ async function poll() {
     syncSleep();
     syncNightStyle();
     screen.render();
+    renderKeepOn();
     maybeReturnHome();
     return true;
   } catch (e) {

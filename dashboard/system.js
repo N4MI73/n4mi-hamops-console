@@ -206,7 +206,41 @@ function renderSources(s) {
     sourceRow("NWS forecast", `internet · ${mode} grid`, w.forecast),
     sourceRow("Weather radio list", "stored on this Pi · updated weekly", w.weather_radio, radioAge(w.weather_radio)),
   ];
+  const sat = satRow(mode, w.lightning);
+  if (sat) rows.splice(mode === "field" ? 2 : 3, 0, sat);
   $("sources").replaceChildren(...rows.flat());
+}
+
+/* GOES satellite lightning (2026-11-20): Field detection, or the at-home test, with the
+   data counter. Home: shown only while the test runs or after it has used data today. */
+function satRow(mode, l) {
+  const sys = (state.data.system || {}).satellite_lightning;
+  if (!sys) return null;
+  const level = sys.level === "economy" ? "Economy" : "Full";
+  const used = `${dash(sys.mb_today)} MB today`;
+  if (mode === "field" && l && l.source === "GOES satellite") {
+    if (l.status === "off") {
+      const mid = el("div", "what");
+      mid.append(el("b", "", "GOES satellite"), el("span", "", `lightning · off · ${used}`));
+      return [el("span", "dot off"), mid, el("span", "age", "off")];
+    }
+    return sourceRow("GOES satellite", `lightning · ${level} · ${dash(sys.mb_last_hour)} MB/h · ${used}`, l);
+  }
+  if (mode !== "home" || (!sys.home_test && !sys.mb_today)) return null;
+  const mid = el("div", "what");
+  if (!sys.home_test) {
+    mid.append(el("b", "", "GOES satellite"), el("span", "", `at-home test off · ${used}`));
+    return [el("span", "dot off"), mid, el("span", "age", "off")];
+  }
+  const t = sys.test || {};
+  const seen = t.closest_mi != null
+    ? `closest ${t.closest_mi} mi ${t.closest_bearing || ""}${t.last_strike_at ? " at " + mainTime(new Date(t.last_strike_at)) : ""}`
+    : (sys.status === "ok" ? "none within 20 mi" : (sys.message || "no satellite data"));
+  mid.append(el("b", "", "GOES satellite · at-home test"), el("span", "", `${seen} · ${used}`));
+  const dot = sys.status === "ok" ? "good" : sys.status === "stale" ? "fair" : "bad";
+  const right = sys.status !== "ok" ? (sys.status || "--").toUpperCase()
+    : sys.home_test_since ? `since ${mainTime(new Date(sys.home_test_since))}` : "running";
+  return [el("span", "dot " + dot), mid, el("span", "age" + (sys.status === "ok" ? "" : " stale"), right)];
 }
 
 function render() {

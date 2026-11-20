@@ -145,12 +145,12 @@ def _field_lightning(lightning):
     closest, bearing = lightning.get("closest_mi"), lightning.get("closest_bearing")
     where = (f"{closest:g} mi {bearing}" if isinstance(closest, (int, float)) and bearing
              else f"{closest:g} mi" if isinstance(closest, (int, float)) else "nearby")
+    # Short, so the Priority Card shows it whole; the card's label names the GOES satellite.
     count = lightning.get("strikes_recent")
-    flashes = (f"{count} flash{'' if count == 1 else 'es'} in the last {lightning.get('window_min')} min."
-               if count else "")
+    flashes = (f"{count} flash{'' if count == 1 else 'es'} in {lightning.get('window_min')} min." if count else "")
     last = freshness.parse_time(lightning.get("last_strike_at"))
-    at = f"Last at {clock_text(last)}." if last else ""
-    source = "GOES satellite · check your lightning app."
+    at = f"At {clock_text(last)}." if last else ""
+    source = ""
     if lightning.get("within_5mi"):
         until = freshness.parse_time(lightning.get("hold_until_5mi"))
         stay = f"Stay in until {clock_text(until)}." if until else ""
@@ -167,8 +167,8 @@ def _field_lightning(lightning):
         return [_item("lightning_10mi", f"Lightning {where}", _join(flashes, wait, source),
                       lightning.get("last_strike_at"), "weather.lightning", "lightning-10mi", "yellow")]
     if lightning.get("within_20mi"):
-        seen = f"{where} at {clock_text(last)}." if last and where != "nearby" else at
-        return [_item("lightning_20mi", "Lightning within 20 mi", _join(seen, flashes, source),
+        title = f"Lightning within 20 mi · {where}" if where != "nearby" else "Lightning within 20 mi"
+        return [_item("lightning_20mi", title, _join(at, flashes, "Check your lightning app."),
                       lightning.get("last_strike_at"), "weather.lightning", "lightning-20mi", "yellow")]
     return []
 
@@ -179,10 +179,9 @@ def _lightning_off_recent(lightning):
     if not recent:
         return []
     last = freshness.parse_time(recent.get("last_strike_at"))
-    title = f"Lightning detection off · strikes within 20 mi at {clock_text(last)}" if last else \
-        "Lightning detection off · strikes within 20 mi"
-    item = _item("lightning_off_recent", title,
-                 "This is not an all-clear. Turn lightning detection back on to keep watching.",
+    when = f" at {clock_text(last)}" if last else ""
+    item = _item("lightning_off_recent", "Lightning detection off",
+                 f"Strikes within 20 mi{when}. Not an all-clear.",
                  recent.get("last_strike_at"), "weather.lightning", f"lightning-off-recent-{recent.get('last_strike_at')}",
                  "yellow")
     item["action"] = "lightning_on"

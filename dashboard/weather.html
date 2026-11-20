@@ -41,6 +41,7 @@
         <div class="tile-head"><span class="name">THIS LOCATION</span><span class="fresh" id="here-fresh">--</span></div>
         <div class="state-row" id="row-lightning">
           <span class="dot"></span><span class="what" id="lt-what">--</span><span class="note" id="lt-note"></span>
+          <button class="row-act" id="lt-act" hidden>Turn on</button>
         </div>
         <div class="state-row" id="row-alerts">
           <span class="dot"></span><span class="what" id="al-what">--</span><span class="note" id="al-note"></span>
@@ -88,8 +89,10 @@
   <div class="help-cols">
     <section class="tile help-col">
       <span class="help-head">THIS LOCATION</span>
-      <p><b>Lightning</b>: detected lightning near the console. At home it comes from the home weather station (Tempest): <b class="f">amber</b> within 10 mi, flashing <b class="r">red</b> within 5 mi.</p>
-      <p>The 5-mile alert holds for 30 minutes after the last strike (the 30/30 rule). <b>Clear</b> ends it early if you know the storm has gone; the next strike restarts it.</p>
+      <p data-mode="home"><b>Lightning</b>: detected lightning near the console. At home it comes from the home weather station (Tempest): <b class="f">amber</b> within 10 mi, flashing <b class="r">red</b> within 5 mi.</p>
+      <p data-mode="home">The 5-mile alert holds for 30 minutes after the last strike (the 30/30 rule). <b>Clear</b> ends it early if you know the storm has gone; the next strike restarts it.</p>
+      <p data-mode="field" hidden><b>Lightning</b>: the GOES satellite, switched on when needed (<b>Turn on</b> here, on the forecast card or in Settings). Full uses about 60 MB an hour; Economy 20 MB, sampled once a minute.</p>
+      <p data-mode="field" hidden><b class="f">Amber</b> within 20 mi (check your lightning app) and 10 mi, flashing <b class="r">red</b> within 5 mi; each holds 30 min after the last flash. Off when the NWS outlook clears, or after 6 h with none (it asks first). <b>Off</b> or <b>data late</b> is never an all-clear.</p>
       <p><b>Lightning possible / likely</b>: an NWS <i>forecast</i>, not a detection. A reason to watch the sky and the radio.</p>
       <p><b>NWS alerts</b>: the worst active warning, watch or advisory for this spot, with when it ends.</p>
       <p class="tip">A Severe Thunderstorm Warning is about wind and hail; lightning can come with any storm, warned or not.</p>

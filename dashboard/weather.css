@@ -21,6 +21,13 @@
 .state-row.fair .note { color: #D9C9A8; }
 .state-row.bad { background: var(--bad-bg); border-color: var(--bad-line); }
 .state-row.bad .note { color: var(--bad-label); }
+/* Field lightning's Turn on / Turn off (2026-11-20), at the right of the row */
+.state-row .row-act {
+  margin-left: auto; flex-shrink: 0; height: 34px; padding: 0 14px; font-size: 17px; font-weight: 700;
+  color: #FFFFFF; background: #17212C; border: 2px solid var(--info); border-radius: 8px;
+}
+.state-row .row-act.off { color: var(--ink-2); background: var(--ground); border: 1px solid #2E3B49; }
+.state-row .row-act:disabled { opacity: 0.5; }
 
 /* -- Now and Weather Radio */
 .now-main { display: flex; align-items: baseline; gap: 12px; white-space: nowrap; }

@@ -10,7 +10,7 @@
    Text is set with textContent only. */
 "use strict";
 
-const LIGHTNING_HOLDS = new Set(["lightning_5mi", "lightning_frequent", "lightning_10mi"]);
+const LIGHTNING_HOLDS = new Set(["lightning_5mi", "lightning_frequent", "lightning_10mi", "lightning_20mi"]);
 const SOURCE_NAMES = {
   "weather.alerts": "NWS", "weather.lightning": "Weather Sentinel", "weather.conditions": "Weather Sentinel",
   "weather.forecast": "NWS forecast", "propagation": "PropMon",
@@ -36,7 +36,8 @@ function tagFor(item) {
   if (item.critical) return {text: "CRITICAL", outline: false};
   if (c === "hazard_alert") return {text: (item.kind || "alert").toUpperCase(), outline: false};
   if (c === "alerts_unavailable_storms") return {text: "NWS DOWN", outline: false};
-  if (c === "lightning_frequent" || c === "lightning_10mi") return {text: "LOCAL", outline: true};
+  if (c === "lightning_frequent" || c === "lightning_10mi" || c === "lightning_20mi") return {text: "LOCAL", outline: true};
+  if (c === "lightning_off_recent") return {text: "DETECTION OFF", outline: true};
   if (c === "lightning_likely_soon" || c === "lightning_outlook") return {text: "FORECAST", outline: true};
   if (c === "source_down") return {text: /test mode/i.test(item.title || "") ? "TEST" : "SOURCE", outline: true};
   if (c === "propagation") return {text: "BANDS", outline: true};
@@ -55,7 +56,13 @@ function makeTag(item) {
 const NWS_PRODUCTS = new Set(["hazard_warning", "hazard_alert", "temperature_alert", "other_warning", "other_notice"]);
 function isNws(item) { return NWS_PRODUCTS.has(item.category); }
 function nwsCurrent() { return (state.data.alerts || {}).nws_alerts_status === "ok"; }
-function sourceName(item) { return SOURCE_NAMES[item.ref && item.ref.block] || ""; }
+function sourceName(item) {
+  const block = item.ref && item.ref.block;
+  if (block === "weather.lightning" && satLightning()) return "GOES satellite";   // Field (2026-11-20)
+  const prop = (state.data.propagation || {}).propagation;
+  if (block === "propagation" && prop && prop.source) return prop.source;          // HamQSL + NOAA SWPC in Field Mode
+  return SOURCE_NAMES[block] || "";
+}
 
 /* "Tuesday" only when it isn't today, so a time a day away can't be misread. */
 function shortTime(iso) {
@@ -177,6 +184,8 @@ function renderDetails() {
     $("d-instruction").hidden = true;
     $("d-ack").hidden = true;
     $("d-clear").hidden = true;
+    $("d-turnon").hidden = true;
+    $("d-dismiss").hidden = true;
     return;
   }
   panel.className = `al-panel ${item.color}`;
@@ -199,6 +208,11 @@ function renderDetails() {
   if (Date.now() - page.clearArmed > 10000) page.clearArmed = 0;
   clear.textContent = page.clearArmed ? "Confirm clear" : "Clear hold";
   clear.classList.toggle("armed", !!page.clearArmed);
+  const turnOn = $("d-turnon");
+  turnOn.hidden = item.action !== "lightning_on";
+  turnOn.textContent = item.category === "lightning_off_recent" ? "Turn lightning detection back on"
+    : "Turn on lightning detection";
+  $("d-dismiss").hidden = item.category !== "lightning_off_recent";
 }
 
 async function acknowledge(id) {
@@ -217,6 +231,8 @@ $("d-clear").addEventListener("click", async () => {
   try { await fetch("/api/alerts/clear-hold", {method: "POST"}); } catch (e) { /* next poll */ }
   poll();
 });
+$("d-turnon").addEventListener("click", e => { e.target.disabled = true; lightningAction("on").finally(() => { e.target.disabled = false; }); });
+$("d-dismiss").addEventListener("click", e => { e.target.disabled = true; lightningAction("dismiss_recent").finally(() => { e.target.disabled = false; closeDetails(); }); });
 $("d-close").addEventListener("click", closeDetails);
 $("details").addEventListener("click", e => { if (e.target === $("details")) closeDetails(); });
 

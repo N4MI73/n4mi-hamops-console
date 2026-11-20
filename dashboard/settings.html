@@ -119,7 +119,7 @@
   </div>
 
   <!-- Data sources -->
-  <div class="st-body st-two" id="tab-sources" hidden>
+  <div class="st-body st-src" id="tab-sources" hidden>
     <section class="tile" aria-label="Home data sources">
       <span class="st-head">DATA SOURCES · HOME MODE</span>
       <span class="st-label">PropMon address</span>
@@ -138,6 +138,22 @@
         <button class="st-action" id="radio-update">Update now</button>
       </div>
       <span class="st-note" id="radio-note">Stored on this Pi so the Weather Radio panel works with no internet. It updates itself weekly; update it before a field event.</span>
+    </section>
+
+    <!-- Field lightning (approved board F, 2026-11-12; built 2026-11-20) -->
+    <section class="tile" aria-label="Field lightning detection">
+      <span class="st-head">FIELD LIGHTNING DETECTION</span>
+      <div class="seg">
+        <button id="fl-off" aria-pressed="true">Off</button>
+        <button id="fl-on" aria-pressed="false">On<span class="soon" id="fl-on-soon" hidden>Field Mode</span></button>
+      </div>
+      <div class="seg small">
+        <button id="fl-full" aria-pressed="true">Full</button>
+        <button id="fl-economy" aria-pressed="false">Economy</button>
+      </div>
+      <span class="st-note">Full: every satellite file, about 60 MB an hour. Economy: one a minute, about 20 MB an hour; may miss single strikes.</span>
+      <span class="st-note">Turns itself off when the NWS outlook clears, or after 6 hours with none (it asks first).</span>
+      <span class="st-note st-foot" id="fl-used">--</span>
     </section>
   </div>
 

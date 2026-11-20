@@ -112,6 +112,11 @@ button:disabled { cursor: default; }
 }
 .act.quiet { min-width: 150px; color: var(--ink); background: #1C0D0C; border-color: #8C3631; }
 .act.quiet.armed { background: #5A1F1B; border-color: var(--bad-line); }
+/* Turn on lightning detection (Field, 2026-11-20): the info colour, two lines when long */
+.act.go {
+  min-width: 0; max-width: 250px; height: 60px; padding: 0 16px; font-size: 19px; line-height: 1.1;
+  white-space: normal; color: #FFFFFF; background: #17212C; border: 2px solid var(--info);
+}
 .pager { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .pager button {
   width: 60px; height: 60px; font-size: 30px; font-weight: 600; color: var(--ink);
@@ -206,6 +211,28 @@ button:disabled { cursor: default; }
 .sd-restart { flex: 1 1 0; }
 .sd-shutdown { flex: 1 1 0; color: #FFFFFF !important; background: #5A1A17 !important; border: 2px solid #E0605A !important; }
 .sd-buttons button:disabled.sd-cancel, .sd-buttons button:disabled.sd-shutdown { opacity: 0.5; }
+
+/* -- Keep lightning detection on? (2026-11-20): below the Priority Card, which stays in view */
+.ko-overlay {
+  position: fixed; left: 0; right: 0; top: 250px; bottom: 0; z-index: 35;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 18px;
+  background: rgba(5, 8, 12, 0.82);
+}
+.ko-panel {
+  width: 900px; padding: 24px 30px; display: flex; flex-direction: column; gap: 12px;
+  background: var(--fair-bg); border: 2px solid var(--fair-line); border-radius: 14px;
+}
+.ko-head { font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: var(--fair-label); }
+.ko-title { font-size: 29px; font-weight: 700; line-height: 1.2; }
+.ko-note { font-size: 21px; color: var(--ink-2); }
+.ko-buttons { display: flex; gap: 14px; margin-top: 6px; }
+.ko-buttons button {
+  height: 76px; font-size: 25px; font-weight: 700; border-radius: 12px; color: var(--ink);
+  background: var(--ground); border: 1px solid #2E3B49;
+}
+.ko-keep { flex: 1.6 1 0; color: #FFFFFF !important; background: #17212C !important; border: 2px solid var(--info) !important; }
+.ko-off { flex: 1 1 0; }
+.ko-buttons button:disabled { opacity: 0.5; }
 
 /* -- Red night style (2026-11-12): every colour becomes its brightness in red only */
 html.night-red { filter: url(#hoc-red); }

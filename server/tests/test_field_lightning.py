@@ -186,9 +186,9 @@ class Tiers(unittest.TestCase):
         self.assertEqual(b["closest_bearing"], "WSW")
         top = ranked(self.source)[0]
         self.assertEqual(top["category"], "lightning_20mi")
-        self.assertEqual(top["title"], "Lightning within 20 mi")
-        self.assertIn("14 mi WSW at", top["detail"])
-        self.assertIn("GOES satellite", top["detail"])
+        self.assertEqual(top["title"], "Lightning within 20 mi · 14 mi WSW")
+        self.assertIn("At ", top["detail"])
+        self.assertIn("lightning app", top["detail"])
         self.assertFalse(top["critical"])
 
     def test_10_and_5_mile_tiers(self):
@@ -476,8 +476,9 @@ class TurnedOffWithLightningRecent(unittest.TestCase):
         self.source.turn_off()
         items = ranked(self.source)
         card = [i for i in items if i["category"] == "lightning_off_recent"][0]
-        self.assertIn("strikes within 20 mi at", card["title"])
-        self.assertIn("not an all-clear", card["detail"])
+        self.assertEqual("Lightning detection off", card["title"])
+        self.assertIn("Strikes within 20 mi at", card["detail"])
+        self.assertIn("Not an all-clear", card["detail"])
         self.assertEqual(card["action"], "lightning_on")
         self.assertIsNone(self.source.block()["within_20mi"])   # off: unknown, never false
         self.clock.now += timedelta(minutes=31)

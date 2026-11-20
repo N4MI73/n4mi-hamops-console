@@ -242,6 +242,27 @@ function renderSources() {
   const r = (state.data.weather || {}).weather_radio;
   $("radio-age").textContent = radioAgeWords(r);
   $("radio-update").disabled = !!(r && r.updating);
+  renderFieldLightning();
+}
+
+/* Field lightning (board F): on/off is the console's switch (POST /api/lightning), not a
+   setting; Full/Economy is a setting. On is for Field Mode only. */
+function renderFieldLightning() {
+  const l = satLightning();
+  const d = (l && l.detection) || {};
+  const field = mode() === "field";
+  press("fl-off", !d.on);
+  press("fl-on", !!d.on);
+  $("fl-on").disabled = !field;
+  $("fl-on-soon").hidden = field;
+  const level = (settings().field_lightning || {}).level === "economy" ? "economy" : "full";
+  press("fl-full", level === "full");
+  press("fl-economy", level === "economy");
+  const sys = (state.data.system || {}).satellite_lightning;
+  const used = sys ? `Used today: ${dash(sys.mb_today)} MB${sys.running ? ` · ${dash(sys.mb_last_hour)} MB in the last hour` : ""}` : "--";
+  const why = sys && sys.reader === false ? " · can't read satellite files yet (python3-netcdf4 not installed)" : "";
+  $("fl-used").textContent = used + why;
+  $("fl-used").className = "st-note st-foot" + (why ? " warn" : "");
 }
 
 // ----------------------------------------------------------------- Wi-Fi tab (2026-11-17)
@@ -423,6 +444,16 @@ $("mc-local").addEventListener("click", () => { if (mainClock() !== "local") sav
 $("ns-dim").addEventListener("click", () => saveOrSay({display: {night_style: "dim"}}));
 $("ns-red").addEventListener("click", () => saveOrSay({display: {night_style: "red"}}));
 $("red-preview").addEventListener("click", () => previewRed(10));
+$("fl-on").addEventListener("click", async () => {
+  const d = (satLightning() || {}).detection || {};
+  if (!d.on && !(await lightningAction("on"))) say("Lightning detection didn't turn on (the console service didn't accept it).", "bad");
+});
+$("fl-off").addEventListener("click", async () => {
+  const d = (satLightning() || {}).detection || {};
+  if (d.on && !(await lightningAction("off"))) say("Lightning detection didn't turn off (the console service didn't answer).", "bad");
+});
+$("fl-full").addEventListener("click", () => saveOrSay({field_lightning: {level: "full"}}));
+$("fl-economy").addEventListener("click", () => saveOrSay({field_lightning: {level: "economy"}}));
 
 for (const [id, key] of [["day-b", "day_brightness_pct"], ["night-b", "night_brightness_pct"]]) {
   const slider = $(id);

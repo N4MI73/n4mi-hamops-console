@@ -38,6 +38,8 @@ const isStorm = text => /thunder|t-storm/i.test(text || "");
 
 function renderHere() {
   const w = state.data.weather || {};
+  // Help: the lightning lines for this mode (Field: the GOES satellite, 2026-11-20).
+  for (const p of document.querySelectorAll("#help [data-mode]")) p.hidden = p.dataset.mode !== (w.mode || "home");
   const a = w.alerts, l = w.lightning, fc = w.forecast;
   setFresh($("here-fresh"), a, "NWS");
   renderLightningRow(l, fc);
@@ -47,6 +49,9 @@ function renderHere() {
 function renderLightningRow(l, fc) {
   const outlook = fc && fc.status !== "unavailable" ? fc.lightning_outlook : null;
   const outlookNote = outlook ? `${outlook.level} ${whenWords(outlook.start)} · NWS forecast, not detected` : "none forecast";
+  const act = $("lt-act");
+  act.hidden = true;
+  if (l && l.source === "GOES satellite") { renderSatRow(l, outlook, act, !fc || fc.status === "unavailable"); return; }
 
   if (l && (l.status === "ok" || l.status === "stale")) {      // Home Mode: the home Tempest
     const stale = l.status === "stale" ? " (STALE)" : "";
@@ -84,6 +89,62 @@ function renderLightningRow(l, fc) {
     setRow("row-lightning", l || fcStale ? "fair" : "good", "No lightning forecast" + fcStale, lost + "NWS · next 12 hours");
   }
 }
+
+/* Field Mode lightning from the GOES satellite (approved board E, 2026-11-12): every state
+   says whether detection is on, and has a Turn on / Turn off button. Never an all-clear
+   while detection is off or its data is late. */
+function renderSatRow(l, outlook, act, fcGone) {
+  const d = l.detection || {};
+  const fcNote = outlook ? `NWS: ${outlook.level} ${whenWords(outlook.start)}` : fcGone ? "forecast unavailable" : "none forecast";
+  const where = l.closest_mi != null ? `${l.closest_mi} mi${l.closest_bearing ? " " + l.closest_bearing : ""}` : "nearby";
+  const late = l.status === "stale" || l.status === "unavailable";
+  const lateNote = late ? "Satellite data late · " : "";
+  const last = l.last_strike_at ? mainTime(new Date(l.last_strike_at)) : null;
+  const flashes = l.strikes_recent ? `${l.strikes_recent} in ${l.window_min} min` : null;
+  act.hidden = false;
+  act.textContent = d.on ? "Turn off" : (d.recent_at_off ? "Turn back on" : "Turn on");
+  act.classList.toggle("off", !!d.on);
+  act.dataset.action = d.on ? "off" : "on";
+
+  if (!d.on) {
+    const recent = d.recent_at_off;
+    if (recent) {
+      setRow("row-lightning", "fair", `Detection off · strikes${recent.last_strike_at ? " at " + mainTime(new Date(recent.last_strike_at)) : " recently"}`,
+        "within 20 mi · not an all-clear");
+    } else {
+      setRow("row-lightning", outlook || fcGone ? "fair" : "", "Lightning detection off", fcNote);
+    }
+    return;
+  }
+  if (l.within_5mi) {
+    setRow("row-lightning", "bad", `Lightning ${where}`,
+      [l.hold_until_5mi ? `Stay in until ${mainTime(new Date(l.hold_until_5mi))}` : null, lateNote ? "data late" : null,
+       flashes, "GOES satellite"].filter(Boolean).join(" · "));
+  } else if (l.within_10mi) {
+    setRow("row-lightning", "fair", `Lightning ${where}`,
+      [l.hold_until_10mi ? `Hold until ${mainTime(new Date(l.hold_until_10mi))}` : null, lateNote ? "data late" : null,
+       flashes, "GOES satellite"].filter(Boolean).join(" · "));
+  } else if (l.within_20mi) {
+    setRow("row-lightning", "fair", `Lightning ${where}`,
+      [last ? `within 20 mi at ${last}` : "within 20 mi", lateNote ? "data late" : null, flashes, "check your lightning app"]
+        .filter(Boolean).join(" · "));
+  } else if (d.starting) {
+    setRow("row-lightning", "", "Lightning detection starting", "First satellite file within a minute");
+  } else if (late || l.within_20mi !== false) {
+    setRow("row-lightning", "bad", "Satellite data late", `Not the same as no lightning${l.message ? " · " + l.message : ""}`);
+  } else {
+    // Economy is said in the main words too, so it can't be lost when the note is cut short.
+    const eco = d.level === "economy";
+    setRow("row-lightning", outlook || fcGone ? "fair" : "good",
+      eco ? "No lightning within 20 mi · sampled" : "No lightning detected within 20 mi",
+      [eco ? "may miss single strikes" : "GOES satellite · Full", outlook || fcGone ? fcNote : null].filter(Boolean).join(" · "));
+  }
+}
+
+$("lt-act").addEventListener("click", async e => {
+  e.target.disabled = true;
+  try { await lightningAction(e.target.dataset.action); } finally { e.target.disabled = false; }
+});
 
 function renderAlertsRow(a) {
   if (!a || a.status === "unavailable") {
