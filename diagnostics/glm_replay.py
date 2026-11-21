@@ -18,6 +18,7 @@ Run on the Pi, in the SSH window, from the repository folder:
     python3 diagnostics/glm_replay.py --grid AB12cd --start 2025-07-14T20:00Z --hours 2
     python3 diagnostics/glm_replay.py --grid AB12cd --start 2024-06-05T21:30Z --hours 1.5 --satellite goes16
     python3 diagnostics/glm_replay.py ... --economy          # one file a minute, as Economy would
+    python3 diagnostics/glm_replay.py ... --verbose          # a line for every change (long in a big storm)
 
 --grid      the 6-character grid to measure from (your own; it is not saved anywhere)
 --start     start of the window, UTC (e.g. 2025-07-14T20:00Z)
@@ -97,7 +98,11 @@ def lightning_card(items):
     return None
 
 
-def replay(grid, start, hours, satellite="goes19", economy=False, fetch=fl.fetch_bytes, out=print):
+HEARTBEAT = timedelta(minutes=5)       # during a storm, a progress line at least this often
+CLOSER_MI = 1.0                        # ... and whenever lightning comes this much closer
+
+
+def replay(grid, start, hours, satellite="goes19", economy=False, fetch=fl.fetch_bytes, out=print, verbose=False):
     if not grid_mod.is_valid(grid) or len(grid) != 6:
         raise SystemExit("--grid must be a 6-character grid, e.g. AB12cd")
     if not 0 < hours <= 6:
@@ -121,9 +126,12 @@ def replay(grid, start, hours, satellite="goes19", economy=False, fetch=fl.fetch
                        freshness.OK)
         end = start + timedelta(hours=hours)
         out(f"Replaying {satellite} {start:%Y-%m-%d %H:%MZ} for {hours:g} h from {grid} "
-            f"({'Economy' if economy else 'Full'}); one line per change.")
+            f"({'Economy' if economy else 'Full'}); "
+            + ("a line for every change." if verbose else
+               "a line when the card changes, lightning comes a mile closer, or every 5 minutes in a storm."))
         last_card, last_count, cleared_at, firsts, peak = None, 0, None, {}, (0, None)
         last_status = freshness.OK
+        last_line, last_closest = None, None
         outer = settings["thresholds"]["lightning_field_outer_mi"]
         while clock.now <= end:
             source.poll_once()
@@ -142,15 +150,22 @@ def replay(grid, start, hours, satellite="goes19", economy=False, fetch=fl.fetch
                 peak = (minute, clock.now)
             key = (card["category"], card["title"]) if card else None
             stamp = alerts.clock_text(clock.now)
-            if key != last_card or count > last_count:
+            closest = block.get("closest_mi")
+            changed = key != last_card
+            closer = (closest is not None and last_closest is not None and closest <= last_closest - CLOSER_MI)
+            due = card is not None and last_line is not None and clock.now - last_line >= HEARTBEAT
+            if changed or closer or due or (verbose and count > last_count):
                 if card:
-                    new = f" · {count - last_count} new" if count > last_count else ""
+                    new = f" · {count - last_count} new" if verbose and count > last_count else ""
                     out(f"{stamp}  [{card['category'].replace('lightning_', '')}{' CRITICAL' if card['critical'] else ''}]"
                         f"  {card['title']}  ·  {card['detail']}{new}")
                 elif last_card:
                     out(f"{stamp}  holds cleared: no lightning card")
                     cleared_at = clock.now
-                last_card = key
+                last_card, last_line = key, clock.now
+                last_closest = closest if card else None
+            elif closest is not None and last_closest is None:
+                last_closest = closest
             status = block["status"] if clock.now - start > timedelta(minutes=2) else freshness.OK
             if status != last_status:
                 out(f"{stamp}  satellite data {status}" + (f": {block.get('message')}" if status != freshness.OK else ""))
@@ -188,9 +203,10 @@ def main():
     p.add_argument("--hours", type=float, default=2.0)
     p.add_argument("--satellite", choices=sorted(BUCKETS), default="goes19")
     p.add_argument("--economy", action="store_true")
+    p.add_argument("--verbose", action="store_true")
     a = p.parse_args()
     try:
-        replay(a.grid, a.start, a.hours, a.satellite, a.economy)
+        replay(a.grid, a.start, a.hours, a.satellite, a.economy, verbose=a.verbose)
     except KeyboardInterrupt:
         print("\nStopped.")
 
