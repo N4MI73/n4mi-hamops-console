@@ -32,7 +32,7 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 | `dashboard/` | The touchscreen web page: the Home screen so far, with its bundled fonts, and a service check page at `/check`. See `dashboard/README.md` |
 | `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium) and the service's systemd unit. See `pi/README.md` |
 | `config/` | `settings.example.json`, the template for the console's settings |
-| `diagnostics/` | Small standalone test tools, e.g. `kiosk-test.html` for checking screen rotation and touch |
+| `diagnostics/` | Small standalone test tools: `kiosk-test.html` (screen rotation and touch), `glm_size_check.py` (GOES lightning data cost, listings only), `glm_replay.py` (replays a past storm's archived GOES lightning files through the console's own lightning code and prints what the Priority Card would have said) |
 | `docs/` | Reference documents, including the JSON contracts (`docs/contracts.md`) |
 
 ## Hardware

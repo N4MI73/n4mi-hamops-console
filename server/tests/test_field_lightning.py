@@ -559,6 +559,15 @@ class HomeTestAndCounter(unittest.TestCase):
         source.set_home_test(False)
         self.assertIsNone(source.system_block()["running"])
 
+    def test_home_test_flags_unknown_before_the_first_file(self):
+        source, clock, bucket, _ = make(mode="home")
+        bucket.fail = urllib.error.URLError("offline")
+        source.set_home_test(True)
+        source.poll_once()
+        t = source.system_block()["test"]
+        self.assertIsNone(t["within_20mi"])
+        self.assertIsNone(t["within_5mi"])
+
     def test_a_new_site_starts_afresh(self):
         source, clock, bucket, _ = make()
         source.turn_on()

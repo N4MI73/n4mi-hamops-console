@@ -708,6 +708,11 @@ class FieldLightning:
             }
             if active == "home_test":
                 fields = self._tier_fields(now)
+                if fresh["status"] == freshness.UNAVAILABLE:
+                    # No satellite data yet: a tier with no flash seen is unknown, not "none".
+                    for k in ("within_20mi", "within_10mi", "within_5mi"):
+                        if fields[k] is False:
+                            fields[k] = None
                 out["test"] = {k: fields[k] for k in ("within_20mi", "within_10mi", "within_5mi", "closest_mi",
                                                        "closest_bearing", "last_strike_at", "strikes_recent",
                                                        "window_min")}
