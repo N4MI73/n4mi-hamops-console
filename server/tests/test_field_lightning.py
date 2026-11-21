@@ -215,6 +215,67 @@ class Tiers(unittest.TestCase):
         self.assertFalse(b["within_20mi"])
         self.assertEqual(categories(ranked(self.source)), ["all_quiet"])
 
+    def test_frequent_holds_ten_minutes_after_the_last_busy_minute(self):
+        # six flashes inside 10 mi in one 20-second file: more than 5 a minute
+        self.clock.now += timedelta(seconds=20)
+        self.bucket.flashes[self.bucket.keys_until(self.clock.now)[-1]] = [(7, 90)] * 6
+        self.source.poll_once()
+        self.assertTrue(self.source.block()["frequent"])
+        self.assertEqual(ranked(self.source)[0]["category"], "lightning_frequent")
+        self.strike(8)                                          # a quieter minute: still frequent
+        self.clock.now += timedelta(minutes=2)
+        self.source.poll_once()
+        self.assertTrue(self.source.block()["frequent"])
+        self.clock.now += timedelta(minutes=9)                  # 10+ min after the busy minute
+        self.source.poll_once()
+        b = self.source.block()
+        self.assertFalse(b["frequent"])
+        self.assertTrue(b["within_10mi"])                       # the 30-minute hold still stands
+        self.assertEqual(ranked(self.source)[0]["category"], "lightning_10mi")
+
+    def flash_at(self, t, miles=7):
+        self.source.flashes.append({"time": t, "seen": t, "distance_mi": miles, "bearing": "E"})
+
+    def test_frequent_boundary_is_ten_minutes_from_the_busy_minute(self):
+        busy = self.clock.now - timedelta(seconds=30)
+        for _ in range(6):
+            self.flash_at(busy)
+        self.clock.now = busy + timedelta(minutes=9, seconds=59)
+        self.assertTrue(self.source.block()["frequent"])
+        self.clock.now = busy + timedelta(minutes=10, seconds=1)
+        self.assertFalse(self.source.block()["frequent"])
+
+    def test_sliding_window_bounds(self):
+        base = self.clock.now - timedelta(minutes=2)
+        for s in (0, 12, 24, 36, 48, 60):                      # six across exactly 60 s: frequent
+            self.flash_at(base + timedelta(seconds=s))
+        self.assertTrue(self.source.block()["frequent"])
+        self.source.flashes = []
+        for s in (0, 12, 24, 36, 48, 60.5):                    # six across 60.5 s: not
+            self.flash_at(base + timedelta(seconds=s))
+        self.assertFalse(self.source.block()["frequent"])
+        self.source.flashes = []
+        for s in (0, 10, 20, 30, 40, 75, 85, 95, 105, 115):    # 5 + 5, never 6 in any 60 s
+            self.flash_at(base + timedelta(seconds=s))
+        self.assertFalse(self.source.block()["frequent"])
+
+    def test_replayed_storm_pattern_does_not_flip(self):
+        base = self.clock.now - timedelta(minutes=3)
+        for s in range(0, 60, 10):                             # busy minute (6)
+            self.flash_at(base + timedelta(seconds=s))
+        for s in (70, 100):                                    # quiet minute (2)
+            self.flash_at(base + timedelta(seconds=s))
+        self.clock.now = base + timedelta(minutes=2, seconds=10)
+        self.assertTrue(self.source.block()["frequent"])
+        self.assertEqual(ranked(self.source)[0]["category"], "lightning_frequent")
+        self.assertIn("Wait until", ranked(self.source)[0]["detail"])
+
+    def test_five_a_minute_is_not_frequent(self):
+        self.clock.now += timedelta(seconds=20)
+        self.bucket.flashes[self.bucket.keys_until(self.clock.now)[-1]] = [(7, 90)] * 5
+        self.source.poll_once()
+        self.assertFalse(self.source.block()["frequent"])
+
     def test_beyond_20_miles_is_ignored(self):
         self.strike(23)
         self.assertFalse(self.source.block()["within_20mi"])

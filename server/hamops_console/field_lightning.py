@@ -65,6 +65,7 @@ START_GRACE_SEC = 120         # no "data late" card for the first two minutes af
 RESUME_MAX_MIN = 5            # after a restart, catch up on missed files only this far back
 MAX_FILES_PER_POLL = 15       # five minutes of Full files; anything older is skipped
 FREQUENT_WINDOW_SEC = 60
+FREQUENT_HOLD_MIN = 10        # "frequent" stays on this long after the last busy minute (2026-11-21)
 RECENT_WINDOW_MIN = 10        # "6 flashes in the last 10 min"
 SITE_MOVED_MI = 1.0           # flashes are about one site; a new site starts them afresh
 LIST_TIMEOUT_SEC = 10
@@ -634,8 +635,7 @@ class FieldLightning:
         if ten:
             out["within_10mi"] = True
             out["hold_until_10mi"] = freshness.iso(max(f["time"] for f in ten) + self._hold())
-            last_minute = sum(1 for f in ten if (now - f["time"]).total_seconds() <= FREQUENT_WINDOW_SEC)
-            out["frequent"] = last_minute > self._t("lightning_frequent_per_min")
+            out["frequent"] = self._busy_minute_recent(ten, now)
         five = sorted(f["time"] for f in within if f["distance_mi"] <= high)
         if five:
             # The hold began with the first flash of the run that reaches now: a gap
@@ -648,6 +648,22 @@ class FieldLightning:
             out.update({"within_5mi": True, "hold_until_5mi": freshness.iso(five[-1] + self._hold()),
                         "hold_since_5mi": freshness.iso(since)})
         return out
+
+    def _busy_minute_recent(self, flashes, now):
+        """Frequent lightning (Dan, 2026-11-21): any minute with more than
+        `lightning_frequent_per_min` flashes inside 10 mi in the last FREQUENT_HOLD_MIN
+        minutes. Holding it stops the card flipping between "Frequent lightning" and
+        "Lightning 6 mi" each time one minute is a little quieter (seen in a replayed storm)."""
+        limit = self._t("lightning_frequent_per_min")
+        since = now - timedelta(minutes=FREQUENT_HOLD_MIN, seconds=FREQUENT_WINDOW_SEC)
+        times = sorted(f["time"] for f in flashes if f["time"] >= since and f["time"] <= now)
+        first = 0
+        for last, t in enumerate(times):                 # each flash ends a 60-second window
+            while (t - times[first]).total_seconds() > FREQUENT_WINDOW_SEC:
+                first += 1
+            if last - first + 1 > limit and now - t <= timedelta(minutes=FREQUENT_HOLD_MIN):
+                return True
+        return False
 
     def block(self):
         """The Field Mode `lightning` block (contract section 5)."""

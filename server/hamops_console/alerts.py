@@ -158,8 +158,10 @@ def _field_lightning(lightning):
         return [_item("lightning_5mi", f"Lightning {where}", _join(flashes, stay, source), since,
                       "weather.lightning", f"lightning-5mi-{since}", "red")]
     if lightning.get("frequent"):
+        until = freshness.parse_time(lightning.get("hold_until_10mi"))
+        wait = f"Wait until {clock_text(until)}." if until else ""
         return [_item("lightning_frequent", "Frequent lightning inside 10 mi",
-                      _join(f"Closest {where}.", flashes, source),
+                      _join(f"Closest {where}.", flashes, wait, source),
                       lightning.get("last_strike_at"), "weather.lightning", "lightning-frequent", "yellow")]
     if lightning.get("within_10mi"):
         until = freshness.parse_time(lightning.get("hold_until_10mi"))
