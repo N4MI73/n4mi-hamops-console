@@ -17,7 +17,14 @@ case "$KIOSK_URL" in
     done ;;
 esac
 
-# 4. Chromium fullscreen, restarted automatically if it ever closes.
+# 4. A monitor already plugged in at power-up: turn it off for now, so Chromium opens on
+#    the touchscreen (with it on, labwc put the kiosk window on the monitor; tested
+#    2026-11-24). hdmi-mirror.sh (step 6) turns it back on and mirrors once Chromium is up.
+for out in $(wlr-randr 2>/dev/null | awk '/^HDMI-A-[0-9]+ / {print $1}'); do
+  wlr-randr --output "$out" --off
+done
+
+# 5. Chromium fullscreen, restarted automatically if it ever closes.
 while true; do
   chromium --kiosk --ozone-platform=wayland --noerrdialogs --disable-infobars \
     --no-first-run --password-store=basic --disable-session-crashed-bubble \
@@ -26,7 +33,7 @@ while true; do
   sleep 3
 done &
 
-# 5. Mirror the touchscreen onto an HDMI monitor whenever one is plugged in (2026-11-24).
+# 6. Mirror the touchscreen onto an HDMI monitor whenever one is plugged in (2026-11-24).
 #    Needs the wl-mirror package. The script lives in the repository clone, so git pull
 #    keeps it current.
 sh /home/hamops/hamops-console/pi/labwc/hdmi-mirror.sh &
