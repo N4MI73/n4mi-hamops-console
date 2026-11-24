@@ -64,6 +64,7 @@
       <span class="st-note">Field Day adds the timer to the status bar and, in Field Mode, rates the Field Day bands for North America reach. Alerts are the same in both.</span>
       <span class="st-head">FIELD DAY OPERATIONS · UTC</span>
       <div class="fd-times">
+        <span class="st-label">Setup start</span><button class="field" id="f-fd_setup_date">--</button><button class="field" id="f-fd_setup_time">--</button>
         <span class="st-label">Ops start</span><button class="field" id="f-fd_start_date">--</button><button class="field" id="f-fd_start_time">--</button>
         <span class="st-label">Ops end</span><button class="field" id="f-fd_end_date">--</button><button class="field" id="f-fd_end_time">--</button>
       </div>
@@ -77,6 +78,11 @@
         <button disabled>On<span class="soon">Phase 3</span></button>
       </div>
       <span class="st-note">Dims the screen and checks slow sources less often, to save battery and data. NWS alerts are never slowed.</span>
+      <!-- The ARRL 24-hour rule (2026-11-22), shown with the Field Day profile on. -->
+      <div class="fd-rule" id="fd-rule" hidden>
+        <span class="st-head">FIELD DAY RULES</span>
+        <span class="st-note">ARRL Field Day: a station that starts setting up before 18:00Z Saturday may operate only 24 hours in a row, so set Ops end 24 h after Ops start.</span>
+      </div>
     </section>
   </div>
 
@@ -96,25 +102,42 @@
       </div>
     </section>
 
-    <section class="tile" aria-label="Brightness">
-      <span class="st-head">BRIGHTNESS</span>
-      <label class="st-slider-label" for="day-b"><span>Day brightness</span><span id="day-b-val">--</span></label>
-      <input class="st-slider" id="day-b" type="range" min="5" max="100" step="5">
-      <label class="st-slider-label" for="night-b"><span>Night brightness</span><span id="night-b-val">--</span></label>
-      <input class="st-slider" id="night-b" type="range" min="5" max="100" step="5">
-      <span class="st-note" id="bright-note">--</span>
-    </section>
+    <!-- Brightness and Night stacked in the middle column to make room for Panel cycling
+         (approved board CycleSettings, 2026-11-22). -->
+    <div class="st-stack">
+      <section class="tile" aria-label="Brightness">
+        <span class="st-head">BRIGHTNESS</span>
+        <label class="st-slider-label" for="day-b"><span>Day brightness</span><span id="day-b-val">--</span></label>
+        <input class="st-slider" id="day-b" type="range" min="5" max="100" step="5">
+        <label class="st-slider-label" for="night-b"><span>Night brightness</span><span id="night-b-val">--</span></label>
+        <input class="st-slider" id="night-b" type="range" min="5" max="100" step="5">
+        <span class="st-note" id="bright-note">--</span>
+      </section>
 
-    <section class="tile" aria-label="Night">
-      <span class="st-head">NIGHT</span>
-      <span class="st-note big">Night style</span>
+      <section class="tile" aria-label="Night">
+        <span class="st-head">NIGHT STYLE</span>
+        <div class="seg small">
+          <button id="ns-dim" aria-pressed="false">Dim</button>
+          <button id="ns-red" class="red-btn" aria-pressed="false">Red</button>
+        </div>
+        <div class="night-times"><span class="st-label">Night</span><button class="field" id="f-night_start">--</button><span class="st-label">to</span><button class="field" id="f-night_end">--</button></div>
+        <div class="night-foot"><span class="st-note">Night times are local.</span><button class="st-action" id="red-preview">Preview Red · 10 s</button></div>
+      </section>
+    </div>
+
+    <!-- Panel cycling (approved board CycleSettings, 2026-11-22) -->
+    <section class="tile cyc-tile" aria-label="Panel cycling">
+      <span class="st-head cyc-head">PANEL CYCLING</span>
       <div class="seg">
-        <button id="ns-dim" aria-pressed="false">Dim</button>
-        <button id="ns-red" class="red-btn" aria-pressed="false">Red</button>
+        <button id="pc-off" aria-pressed="true">Off</button>
+        <button id="pc-on" aria-pressed="false">On</button>
       </div>
-      <div class="st-row"><span class="st-label">Night from</span><button class="field" id="f-night_start">--</button></div>
-      <div class="st-row"><span class="st-label">to</span><button class="field" id="f-night_end">--</button></div>
-      <div style="display:flex;align-items:center;gap:12px"><span class="st-note" style="flex-grow:1">Night times are local.</span><button class="st-action" id="red-preview">Preview Red · 10 s</button></div>
+      <span class="st-note big">Shows Home, Propagation and Weather in turn, 60 seconds each. For a tent display or a mirrored monitor.</span>
+      <div class="preview cyc-rules">
+        <span>A touch pauses it. It carries on from Home after 3 minutes untouched.</span>
+        <span>A new critical alert holds Home until it is acknowledged.</span>
+        <span>Stays on after a restart. Resume normal mode turns it off.</span>
+      </div>
     </section>
   </div>
 
@@ -141,7 +164,7 @@
     </section>
 
     <!-- Field lightning (approved board F, 2026-11-12; built 2026-11-20) -->
-    <section class="tile" aria-label="Field lightning detection">
+    <section class="tile fl-tile" aria-label="Field lightning detection">
       <span class="st-head">FIELD LIGHTNING DETECTION</span>
       <div class="seg">
         <button id="fl-off" aria-pressed="true">Off</button>
@@ -151,8 +174,12 @@
         <button id="fl-full" aria-pressed="true">Full</button>
         <button id="fl-economy" aria-pressed="false">Economy</button>
       </div>
+      <div class="st-row ht-row"><span class="st-label">At-home test</span>
+        <div class="seg small"><button id="ht-off" aria-pressed="true">Off</button><button id="ht-on" aria-pressed="false">On<span class="soon" id="ht-on-soon" hidden>Home Mode</span></button></div>
+      </div>
+      <span class="st-note">At-home test: reads the satellite at home so you can compare it with the Tempest. Results on the System page only; never an alert. Runs until you turn it off.</span>
       <span class="st-note">Full: every satellite file, about 60 MB an hour. Economy: one a minute, about 20 MB an hour; may miss single strikes.</span>
-      <span class="st-note">Turns itself off when the NWS outlook clears, or after 6 hours with none (it asks first).</span>
+      <span class="st-note">Field: turns itself off when the NWS outlook clears, or after 6 hours with none (it asks first).</span>
       <span class="st-note st-foot" id="fl-used">--</span>
     </section>
   </div>
@@ -233,6 +260,7 @@
   <span class="kb-error" id="dp-error" role="alert"></span>
   <div class="kb-actions">
     <button class="kb-cancel" id="dp-cancel">Cancel</button>
+    <button class="kb-cancel" id="dp-clear" hidden>Clear · local midnight</button>
     <div class="spacer"></div>
     <button class="st-done" id="dp-set">Set</button>
   </div>

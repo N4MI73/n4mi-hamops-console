@@ -11,10 +11,11 @@
     "day_brightness_pct": 80,
     "night_brightness_pct": 20,
     "night_start": "22:00",
-    "night_end": "07:00"
+    "night_end": "07:00",
+    "panel_cycling": false
   },
   "profile": "general_hf",
-  "field_day": {"ops_start": null, "ops_end": null},
+  "field_day": {"ops_start": null, "ops_end": null, "setup_start": null},
   "sources": {
     "propmon_url": "http://<propmon-host>:8076",
     "sentinel_url": "http://<sentinel-host>:8085",

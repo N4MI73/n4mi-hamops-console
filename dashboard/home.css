@@ -327,3 +327,15 @@ html.night-red .cell span { font-size: 22px; font-weight: 800; }
 .g-empty { font-size: 20px; color: var(--fair-label); align-self: center; }
 .g-tip { font-size: 17px; color: var(--ink-2); line-height: 1.35; background: var(--well); border: 1px solid var(--panel-line);
   border-radius: 8px; padding: 10px 14px; }
+
+/* Panel cycling indicator and Resume normal mode in the bottom toolbar (boards CycleHome
+   and CyclePaused, approved 2026-11-22). */
+.cyc-status { display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 60px; box-sizing: border-box;
+  background: #0D1826; border: 1px solid #2D5F99; border-radius: 10px; flex-shrink: 0; }
+.cyc-status[hidden], .cyc-resume[hidden] { display: none; }
+.cyc-dot { width: 12px; height: 12px; border-radius: 50%; background: #6FB4FF; flex-shrink: 0; box-sizing: border-box; }
+.cyc-dot.ring { background: none; border: 2px solid #6FB4FF; }
+.cyc-words { display: flex; flex-direction: column; gap: 2px; }
+.cyc-status .cyc-head { font-size: 15px; font-weight: 600; letter-spacing: 0.1em; color: #9CCBFF; }
+.cyc-line { font-size: 18px; color: var(--ink); white-space: nowrap; }
+.toolbar button.cyc-resume { min-width: 0; padding: 0 14px; white-space: nowrap; font-weight: 700; color: #FFFFFF; background: #17212C; border: 2px solid var(--info); }

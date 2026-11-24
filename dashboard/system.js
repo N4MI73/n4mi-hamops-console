@@ -43,6 +43,26 @@ function powerWords(p) {
   return ["No under-voltage", ""];
 }
 
+/* Disk: the drive the system runs from, then the space (Dan, 2026-11-23; wording agreed
+   2026-11-24). Amber when it isn't the NVMe: if the NVMe fails in the field the Pi boots
+   the microSD spare by itself, and this row is the only sign. No card in the slot is
+   only noted, not coloured (nothing is wrong right now). */
+function diskWords(s) {
+  const space = num(s.disk_used_gb) && num(s.disk_total_gb) ? `${s.disk_used_gb.toFixed(1)} of ${s.disk_total_gb} GB` : null;
+  const d = s.drive || {};
+  if (d.root === "nvme") {
+    const card = d.card_in_slot === true ? " · spare card in slot" : d.card_in_slot === false ? " · no spare card in slot" : "";
+    return [space ? `NVMe · ${space}${card}` : `NVMe${card}`, ""];
+  }
+  if (d.root === "microsd") {
+    const nvme = d.nvme_present === true ? " · NVMe found but not booted"
+      : d.nvme_present === false ? " · NVMe not found" : "";
+    return [`microSD SPARE${nvme}`, "fair"];
+  }
+  if (d.root === "usb") return ["USB drive · not the NVMe", "fair"];
+  return [space, ""];
+}
+
 /* "6:04 PM", or "Sun 6:04 PM" when the service started on another day. */
 function shortStart(iso) {
   const d = new Date(iso);
@@ -57,13 +77,13 @@ function renderPi(s) {
   const mem = num(s.memory_used_gb) && num(s.memory_total_gb)
     ? `${s.memory_used_gb.toFixed(1)} of ${s.memory_total_gb.toFixed(1)} GB${num(s.memory_used_pct) ? ` (${s.memory_used_pct} %)` : ""}`
     : (num(s.memory_used_pct) ? `${s.memory_used_pct} %` : null);
-  const disk = num(s.disk_used_gb) && num(s.disk_total_gb) ? `${s.disk_used_gb.toFixed(1)} of ${s.disk_total_gb} GB` : null;
+  const [disk, diskCls] = diskWords(s);
   const [power, powerCls] = powerWords(s.power);
   setFacts("pi-facts", [
     ["CPU temp", tempWords, tempCls],
     ["CPU load", num(s.cpu_load_pct) ? `${s.cpu_load_pct} %` : null],
     ["Memory", mem],
-    ["Disk", disk],
+    ["Disk", disk, (diskCls + " wrap").trim()],
     ["Power", power, powerCls],
     ["Uptime", uptimeWords(s.uptime_sec)],
   ]);

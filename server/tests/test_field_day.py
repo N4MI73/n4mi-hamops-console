@@ -21,10 +21,10 @@ def utc(*a):
     return datetime(*a, tzinfo=timezone.utc)
 
 
-def settings(profile="field_day", start="2027-01-30T19:00Z", end="2027-01-31T19:00Z"):
+def settings(profile="field_day", start="2027-01-30T19:00Z", end="2027-01-31T19:00Z", setup=None):
     s = settings_mod.load(os.path.join(tempfile.mkdtemp(), "missing.json"))
     s["profile"] = profile
-    s["field_day"] = {"ops_start": start, "ops_end": end}
+    s["field_day"] = {"ops_start": start, "ops_end": end, "setup_start": setup}
     return s
 
 
@@ -72,6 +72,33 @@ class Phases(InEastern):
                          ("2027-01-30T19:00:00Z", "2027-01-31T19:00:00Z", "2027-01-30T05:00:00Z"))
         self.assertTrue(b["enabled"])
 
+    def test_setup_start_setting(self):
+        # Dan, 2026-11-22: the director's Setup start replaces local midnight.
+        s = settings(setup="2027-01-30T15:00Z")
+        b = field_day.block(s, utc(2027, 1, 28))
+        self.assertEqual(b["setup_start"], "2027-01-30T15:00:00Z")
+        self.assertTrue(b["setup_start_set"])
+        for now, want in [(utc(2027, 1, 30, 14, 59), "reminder"), (utc(2027, 1, 30, 15), "setup"),
+                          (utc(2027, 1, 30, 19), "operations")]:
+            self.assertEqual(field_day.block(s, now)["phase"], want, now)
+
+    def test_setup_start_days_ahead(self):
+        # ARRL rules allow setup from Friday; a start the day before still counts down.
+        s = settings(setup="2027-01-29T00:00Z")
+        self.assertEqual(field_day.block(s, utc(2027, 1, 29, 1))["phase"], "setup")
+
+    def test_blank_setup_start_is_local_midnight(self):
+        b = field_day.block(settings(setup=None), utc(2027, 1, 28))
+        self.assertEqual(b["setup_start"], "2027-01-30T05:00:00Z")
+        self.assertFalse(b["setup_start_set"])
+
+    def test_setup_start_after_ops_start_is_ignored(self):
+        # The API refuses one, but a hand-edited file could hold it: fall back to midnight.
+        for bad in ("2027-01-30T19:00Z", "2027-01-30T20:00Z", "next week"):
+            b = field_day.block(settings(setup=bad), utc(2027, 1, 28))
+            self.assertEqual(b["setup_start"], "2027-01-30T05:00:00Z", bad)
+            self.assertFalse(b["setup_start_set"], bad)
+
     def test_off_and_unset(self):
         self.assertEqual(field_day.block(settings(profile="general_hf"), utc(2027, 1, 30, 20))["phase"], "off")
         self.assertEqual(field_day.block(settings(start=None, end=None))["phase"], "unset")
@@ -98,6 +125,7 @@ class SettingsChecks(unittest.TestCase):
                                ({"field_day": {"ops_start": "2027-01-30 19:00"}}, "UTC date and time"),
                                ({"field_day": {"ops_start": "2027-02-30T19:00Z"}}, "UTC date and time"),
                                ({"field_day": {"setup": "x"}}, "isn't a Field Day setting"),
+                               ({"field_day": {"setup_start": "Friday"}}, "UTC date and time"),
                                ({"field_day": "soon"}, "must be an object"),
                                ({"field_day": {"ops_start": "2027-01-31T19:00Z", "ops_end": "2027-01-30T19:00Z"}},
                                 "end after they start")]:
@@ -107,6 +135,33 @@ class SettingsChecks(unittest.TestCase):
     def test_end_before_existing_start(self):
         current = settings(start="2027-01-30T19:00Z", end="2027-01-31T19:00Z")
         self.assertTrue(self.check({"field_day": {"ops_end": "2027-01-30T18:00Z"}}, current)[0])
+
+    def test_setup_start_checks(self):
+        current = settings(start="2027-01-30T19:00Z", end="2027-01-31T19:00Z")
+        ok = self.check({"field_day": {"setup_start": "2027-01-30T15:00Z"}}, current)
+        self.assertEqual(ok[:2], ([], []))
+        self.assertEqual(self.check({"field_day": {"setup_start": None}}, current)[:2], ([], []))
+        for same_or_later in ("2027-01-30T19:00Z", "2027-01-30T21:00Z"):
+            errors = self.check({"field_day": {"setup_start": same_or_later}}, current)[0]
+            self.assertTrue(any("setup must start before operations" in e for e in errors), errors)
+        # More than 3 days early: allowed, with a warning.
+        errors, warnings, _ = self.check({"field_day": {"setup_start": "2027-01-26T19:00Z"}}, current)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("more than 3 days" in w for w in warnings), warnings)
+        # Exactly 3 days: no warning.
+        self.assertEqual(self.check({"field_day": {"setup_start": "2027-01-27T19:00Z"}}, current)[1], [])
+
+    def test_moving_ops_start_before_setup_start_is_refused(self):
+        current = settings(start="2027-01-30T19:00Z", end="2027-01-31T19:00Z", setup="2027-01-30T15:00Z")
+        errors = self.check({"field_day": {"ops_start": "2027-01-30T14:00Z"}}, current)[0]
+        self.assertTrue(any("setup must start before operations" in e for e in errors), errors)
+
+    def test_panel_cycling_setting(self):
+        self.assertEqual(self.check({"display": {"panel_cycling": True}})[0], [])
+        self.assertEqual(self.check({"display": {"panel_cycling": False}})[0], [])
+        for bad in ("on", 1, None):
+            errors = self.check({"display": {"panel_cycling": bad}})[0]
+            self.assertTrue(any("true or false" in e for e in errors), (bad, errors))
 
     def test_long_event_warns(self):
         _, warnings, _ = self.check({"field_day": {"ops_start": "2027-01-30T19:00Z", "ops_end": "2027-02-03T19:00Z"}})

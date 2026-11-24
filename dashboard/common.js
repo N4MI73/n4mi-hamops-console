@@ -149,8 +149,8 @@ function setDot(el, cls) { el.className = "dot " + (cls || ""); }
 // ----------------------------------------------------------------- Field Day timer (2026-11-12)
 
 /* The Field Day profile's pill in the status bar (approved 2026-11-05): a reminder before
-   the day, then Setup counting down to the start of operations (from local midnight on
-   the day -- the service works that out), then Operations counting down to the end, then
+   the day, then Setup counting down to the start of operations (from Setup start, or
+   local midnight on the day when that is blank -- the service works it out), then Operations counting down to the end, then
    "Operations complete" until the profile is switched off. Hours:minutes, rounded up so
    it never reads 0:00 while time is left. Times in the pill are UTC, as entered. */
 /* While the pill shows, the status bar drops the date beside the clock to make room. */
@@ -202,7 +202,8 @@ function renderFieldDayPill() {
     label = `Field Day ${day}, ${away}, operations start ${fdUtcHM(start)}`;
   } else if (now < start) {
     // Under a day: hours and minutes until operations; "Setup" once setup has begun
-    // (local midnight on the day). In the last hour the pill fills in solid blue.
+    // (Setup start, or local midnight on the day). A setup started more than a day ahead
+    // reads e.g. "Setup 30:12 until operations". In the last hour the pill fills in solid blue.
     const left = fdHM(start - now);
     const inSetup = now >= setup;
     if (start - now <= 36e5) cls += " soon";
@@ -309,10 +310,158 @@ function maybeReturnHome() {
     location.href = "/";
     return;
   }
+  // While panel cycling is on, its own 3-minute resume replaces this on the screens it
+  // cycles through (the same 3 minutes, counted from the last touch on any screen).
+  if (cyclingOn() && CYCLE_AT >= 0) return;
   if (Date.now() - state.lastActivity > DETAIL_IDLE_MS) location.href = "/";
 }
 for (const ev of ["pointerdown", "keydown"]) {
-  document.addEventListener(ev, () => { state.lastActivity = Date.now(); }, {passive: true});
+  document.addEventListener(ev, () => {
+    state.lastActivity = Date.now();
+    if (cyclingOn()) { const c = recall("hoc.cycle", {}); c.touchAt = Date.now(); remember("hoc.cycle", c); }
+  }, {passive: true, capture: true});
+}
+
+// ----------------------------------------------------------------- panel cycling (2026-11-24)
+
+/* Panel cycling (Dan, 2026-11-22; boards CycleSettings, CycleHome and CyclePaused approved):
+   a Settings switch (display.panel_cycling) that shows Home, Propagation and Weather in
+   turn, 60 seconds each, for a tent display or a mirrored monitor.
+   - Any touch pauses it, so the page never changes under a finger; 3 minutes after the
+     last touch (on any screen) it carries on from Home.
+   - Safety rule: while an unacknowledged critical item is in the list it stays on Home
+     (going there at once if it isn't), so the Priority Card with Acknowledge is what
+     shows; once acknowledged it carries on. A new critical item still sends a paused
+     screen Home at once (maybeReturnHome), as it always has.
+   - It doesn't move while the screen is asleep.
+   - "Resume normal mode" in the bottom toolbar of the three screens turns it off.
+   Which screen it is on, when it got there and the last touch are kept in this browser's
+   session memory, since each screen is its own page. */
+const CYCLE = [["home", "/", "Home"], ["propagation", "/propagation", "Propagation"], ["weather", "/weather", "Weather"]];
+const CYCLE_MS = 60 * 1000;
+const CYCLE_PAUSE_MS = 3 * 60 * 1000;
+const CYCLE_AT = CYCLE.findIndex(c => c[0] === PAGE);
+
+function cyclingOn() {
+  const d = state.data.settings && state.data.settings.display;
+  if (d && typeof d.panel_cycling === "boolean") return d.panel_cycling;
+  return recall("hoc.cycling", false) === true;        // before the settings arrive
+}
+
+function criticalWaiting() {
+  return alertItems().some(i => i.critical && !i.acknowledged);
+}
+
+function mmss(ms) {
+  const sec = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+
+let cycleBar = null;
+function cycleBarEls() {
+  if (cycleBar || CYCLE_AT < 0) return cycleBar;
+  const shutdown = $("shutdown");
+  if (!shutdown) return null;
+  const box = document.createElement("div");
+  box.className = "cyc-status";
+  box.setAttribute("role", "status");
+  box.hidden = true;
+  const dot = document.createElement("span");
+  const words = document.createElement("div");
+  words.className = "cyc-words";
+  const head = document.createElement("span");
+  head.className = "cyc-head";
+  const line = document.createElement("span");
+  line.className = "cyc-line";
+  words.append(head, line);
+  box.append(dot, words);
+  const resume = document.createElement("button");
+  resume.className = "cyc-resume";
+  resume.textContent = "Resume normal mode";
+  resume.hidden = true;
+  resume.addEventListener("click", stopCycling);
+  shutdown.before(box, resume);
+  cycleBar = {box, dot, head, line, resume};
+  return cycleBar;
+}
+
+function showCycleBar(on, ring, head, line) {
+  const b = cycleBarEls();
+  if (!b) return;
+  b.box.hidden = b.resume.hidden = !on;
+  if (!on) return;
+  b.dot.className = "cyc-dot" + (ring ? " ring" : "");
+  b.head.textContent = head;
+  b.line.textContent = line;
+}
+
+async function stopCycling() {
+  try {
+    const r = await fetch("/api/settings", {method: "PUT", headers: {"Content-Type": "application/json"},
+                                            body: JSON.stringify({display: {panel_cycling: false}})});
+    if (r.ok) {
+      const body = await r.json();
+      delete body.warnings;
+      state.data.settings = body;
+      remember("hoc.cycling", false);
+      // A poll already under way could land with the settings from before this change;
+      // ask again so the screen settles on what was saved (as Settings does).
+      settingsAt = 0;
+      setTimeout(poll, 800);
+    }
+  } catch (e) { /* the service didn't answer: the switch stays as it was */ }
+  cycleTick();
+}
+
+let lastPollOk = 0;            // when the console service last answered a poll
+
+function cycleGo(c, index, now) {
+  // Each screen is served by the console service: moving while it doesn't answer (e.g. a
+  // restart after an update) would leave Chromium on its "can't connect" page, which
+  // nothing recovers. Stay put; the service-down line shows meanwhile.
+  if (now - lastPollOk > 20000) return;
+  c.page = CYCLE[index][0];
+  c.since = now;
+  remember("hoc.cycle", c);
+  location.href = CYCLE[index][1];
+}
+
+function cycleTick() {
+  const on = cyclingOn() && CYCLE_AT >= 0;
+  if (!on) { showCycleBar(false); return; }
+  if (!state.receivedAt) return;                  // nothing decided before the first answer
+  const now = Date.now();
+  const c = recall("hoc.cycle", {});
+  if (c.page !== PAGE || !c.since || c.since > now) { c.page = PAGE; c.since = now; remember("hoc.cycle", c); }
+  if (c.touchAt && c.touchAt > now) { c.touchAt = null; remember("hoc.cycle", c); }   // the clock stepped back
+
+  if (c.touchAt && now - c.touchAt < CYCLE_PAUSE_MS) {
+    showCycleBar(true, true, "CYCLING PAUSED", `Resumes in ${mmss(CYCLE_PAUSE_MS - (now - c.touchAt))}`);
+    return;
+  }
+  if (c.touchAt) {                                // the pause is over: carry on from Home
+    c.touchAt = null;
+    if (PAGE !== "home") { cycleGo(c, 0, now); return; }
+    c.since = now;
+    remember("hoc.cycle", c);
+  }
+  if (criticalWaiting()) {
+    if (PAGE !== "home") { cycleGo(c, 0, now); return; }
+    c.since = now;                                // a full minute on Home once acknowledged
+    remember("hoc.cycle", c);
+    showCycleBar(true, true, "CYCLING HELD", "Until the alert is acknowledged");
+    return;
+  }
+  const disp = (state.data.system || {}).display;
+  if (disp && disp.asleep) {                      // nobody is looking: don't move
+    c.since = now;
+    remember("hoc.cycle", c);
+    return;
+  }
+  const next = (CYCLE_AT + 1) % CYCLE.length;
+  const left = CYCLE_MS - (now - c.since);
+  if (left <= 0) { cycleGo(c, next, now); return; }
+  showCycleBar(true, false, `CYCLING · ${CYCLE_AT + 1} OF ${CYCLE.length}`, `${CYCLE[next][2]} next · ${mmss(left)}`);
 }
 
 // ----------------------------------------------------------------- Sleep (2026-11-11)
@@ -764,7 +913,9 @@ async function poll() {
     if (wantSettings) settingsAt = Date.now();
     Object.assign(state.data, {propagation, weather, alerts, system, settings});
     if (settings && settings.display && settings.display.main_clock) remember("hoc.mainClock", settings.display.main_clock);
+    if (settings && settings.display) remember("hoc.cycling", settings.display.panel_cycling === true);
     state.receivedAt = Date.now();
+    lastPollOk = state.receivedAt;
     $("service-down").hidden = true;
     renderStatusBar();
     renderBadge();
@@ -773,6 +924,7 @@ async function poll() {
     screen.render();
     renderKeepOn();
     maybeReturnHome();
+    cycleTick();
     return true;
   } catch (e) {
     $("service-down").hidden = false;
@@ -792,6 +944,7 @@ function startScreen(fns) {
     tickClock();
     if (state.receivedAt) { renderStatusBar(); screen.tick(); }
     maybeReturnHome();
+    cycleTick();
   }, 1000);
   setInterval(() => { if (state.receivedAt) screen.slow(); }, 10000);
   setInterval(poll, POLL_MS);

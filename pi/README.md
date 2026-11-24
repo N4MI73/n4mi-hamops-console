@@ -5,7 +5,8 @@ Files that turn a fresh Raspberry Pi OS Lite install into the console's kiosk di
 | File here | Goes to (on the Pi) | Purpose |
 |---|---|---|
 | `labwc/rc.xml` | `~/.config/labwc/rc.xml` | Ties the touch panel (`11-005d Goodix Capacitive TouchScreen`, the name libinput reports) to the display (`DSI-2`) so touch follows the rotation |
-| `labwc/autostart` | `~/.config/labwc/autostart` | Rotates the display to landscape, waits for the console service, and runs Chromium fullscreen on it, restarting it if it closes |
+| `labwc/autostart` | `~/.config/labwc/autostart` | Rotates the display to landscape, waits for the console service, runs Chromium fullscreen on it (restarting it if it closes), and starts the HDMI mirror |
+| `labwc/hdmi-mirror.sh` | stays in the repository clone (`~/hamops-console/pi/labwc/`) | Mirrors the touchscreen onto an HDMI monitor whenever one is plugged in, and stops when it is unplugged (24 November 2026). Run by `autostart`; needs `wl-mirror` |
 | `profile-kiosk.sh` | appended to `~/.profile` | Starts labwc on the Pi's own screen (tty1) only. SSH sessions are unaffected |
 | `systemd/hamops-console.service` | `/etc/systemd/system/hamops-console.service` | Runs the console service at boot and restarts it if it stops |
 | `udev/99-hamops-backlight.rules` | `/etc/udev/rules.d/99-hamops-backlight.rules` | Lets the console service set the screen brightness and switch the backlight off for Sleep (gives the `video` group write access to the backlight files) |
@@ -15,13 +16,15 @@ Files that turn a fresh Raspberry Pi OS Lite install into the console's kiosk di
 Also needed:
 
 ```
-sudo apt install -y labwc wlr-randr chromium
+sudo apt install -y labwc wlr-randr chromium wl-mirror
 sudo raspi-config nonint do_boot_behaviour B2    # console autologin on the Pi's own screen
 ```
 
 **Rotation:** `--transform 270` in `autostart` gives landscape the right way up on this build (confirmed on the real screen, 1 November 2026). If a different mount shows it upside down, use `90`.
 
 **Touch name:** labwc matches the touch panel by its libinput name, which on this build is `11-005d Goodix Capacitive TouchScreen` (the `11-005d` is its I2C bus and address). Check yours with `sudo libinput list-devices | grep -i -A1 goodix`; if the name in `rc.xml` doesn't match exactly, touch lands a quarter-turn away from your finger.
+
+**HDMI monitor (24 November 2026):** plug a monitor into either micro-HDMI port (HDMI0, next to the USB-C power socket, was tested) and within a few seconds it shows a full-screen copy of the touchscreen, the right way up; unplug it and the copy stops. labwc on its own would extend the desktop onto the monitor instead. Touch stays on the touchscreen. To check what the Pi sees, in the SSH window: `XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 wlr-randr` and `pgrep -a wl-mirror`.
 
 **Off switch:** `touch ~/kiosk.off` and reboot to get the plain text console instead of the kiosk; `rm ~/kiosk.off` and reboot to turn it back on.
 

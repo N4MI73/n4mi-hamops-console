@@ -38,7 +38,7 @@ Every data block carries the same freshness fields (`status`: ok / stale / unava
 | `system_info.py` | Readings from the Pi (temperature, load, memory, disk, power flags, network and Wi-Fi signal, clock, the RTC backup battery, GPS from `gps.py`); each is `null` on a machine that isn't a Pi |
 | `display.py` | Screen brightness by day and night from the settings, and Sleep (backlight off), through `/sys/class/backlight` (2026-11-11) |
 | `power.py` | Shut down and Restart from the touchscreen (`systemctl poweroff` / `reboot`; needs the polkit rule in `pi/polkit/`) (2026-11-11) |
-| `field_day.py` | The Field Day profile's timer: works out when setup starts (local midnight on the operations day) for the status-bar pill (2026-11-12) |
+| `field_day.py` | The Field Day profile's timer: works out when setup starts (the Setup start setting, or local midnight on the operations day when it is blank; 2026-11-24) for the status-bar pill (2026-11-12) |
 | `gps.py` | GPS as a location source (Phase 4, 2026-11-18): reads gpsd on the Pi, keeps the fix and satellites, accepts a new 6-character grid after 2 minutes in the same subsquare (saved in `~/.local/state/hamops-console/gps.json`), and compares GPS time with the Pi's clock (never sets it); `details()` feeds the GPS details panel (`GET /api/gps`) |
 | `location.py` | The grid each data source uses: the typed grid, or the GPS grid for the Field station when its grid source is GPS (2026-11-18) |
 | `glm.py` | Field Mode lightning from NOAA's GOES satellite lightning mapper: reads GLM files, finds flashes near the site, applies the 20/10/5-mile tiers and the 30-minute clear (step 1, 2026-11-13). Needs `python3-netcdf4` to read files |

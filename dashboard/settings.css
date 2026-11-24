@@ -108,7 +108,7 @@
 }
 
 /* -- Field Day times: label, date, time (approved board "Settings · Station & profile") */
-.fd-times { display: grid; grid-template-columns: 84px minmax(0, 1fr) 88px; gap: 8px; align-items: center; }
+.fd-times { display: grid; grid-template-columns: 104px minmax(0, 1fr) 88px; gap: 8px; align-items: center; }
 .fd-times .field { font-size: 19px; padding: 0 10px; }
 
 /* -- date and time picker (mockup approved 2026-11-13), over the whole screen like the keyboard */
@@ -167,3 +167,21 @@
 .wf-empty { font-size: 19px; color: var(--muted); }
 .kb-show { height: 52px; min-width: 110px; font-size: 20px; font-weight: 600; color: var(--ink-2); background: #17212C; border: 1px solid #2E3B49; border-radius: 10px; }
 .kb-show[aria-pressed="true"] { color: #FFFFFF; border: 2px solid var(--info); }
+
+/* At-home lightning test switch (2026-11-24), in the Field Lightning Detection tile. */
+.ht-row { grid-template-columns: 124px minmax(0, 1fr); }
+
+/* Display tab with Panel cycling (approved board CycleSettings, 2026-11-22). */
+.st-stack { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.st-stack .tile { gap: 8px; padding: 12px 18px; }
+.night-times { display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; }
+.night-times .field { height: 48px; }
+.night-foot { display: flex; align-items: center; gap: 12px; }
+.night-foot .st-note { flex-grow: 1; }
+.cyc-tile { border: 2px solid #2D5F99; }
+.cyc-head { color: #9CCBFF; }
+.cyc-rules { display: flex; flex-direction: column; gap: 8px; font-size: 17px; color: var(--ink-2); }
+.st-body .tile.fl-tile { gap: 8px; }
+.fd-rule { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+.fd-rule[hidden] { display: none; }
+.st-stack .st-slider { height: 40px; }

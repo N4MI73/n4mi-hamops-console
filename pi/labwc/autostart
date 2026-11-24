@@ -25,3 +25,8 @@ while true; do
     "$KIOSK_URL"
   sleep 3
 done &
+
+# 5. Mirror the touchscreen onto an HDMI monitor whenever one is plugged in (2026-11-24).
+#    Needs the wl-mirror package. The script lives in the repository clone, so git pull
+#    keeps it current.
+sh /home/hamops/hamops-console/pi/labwc/hdmi-mirror.sh &

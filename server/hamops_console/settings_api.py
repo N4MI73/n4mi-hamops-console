@@ -145,6 +145,9 @@ def check(changes, current):
                 elif field in ("night_start", "night_end"):
                     if not isinstance(value, str) or not HHMM.match(value):
                         errors.append(f"{where}: a 24-hour time such as 22:00")
+                elif field == "panel_cycling":
+                    if not isinstance(value, bool):
+                        errors.append(f"{where} must be true or false")
                 else:
                     errors.append(f"{where} isn't a display setting")
 
@@ -158,17 +161,26 @@ def check(changes, current):
         else:
             for field, value in fd.items():
                 where = f"field_day.{field}"
-                if field not in ("ops_start", "ops_end"):
+                if field not in ("ops_start", "ops_end", "setup_start"):
                     errors.append(f"{where} isn't a Field Day setting")
                 elif value is not None and field_day.parse(value) is None:
                     errors.append(f"{where}: a UTC date and time such as 2027-01-30T19:00Z")
             merged = dict(current.get("field_day") or {}, **fd)
             start, end = field_day.parse(merged.get("ops_start")), field_day.parse(merged.get("ops_end"))
+            setup = field_day.parse(merged.get("setup_start"))
             if start and end:
                 if end <= start:
                     errors.append("field_day: operations must end after they start")
                 elif (end - start).total_seconds() > 72 * 3600:
                     warnings.append("field_day: operations are set to last more than 72 hours")
+            # Setup start (Dan, 2026-11-22): blank = local midnight on the operations day.
+            # It must come before Ops start; more than 3 days before is allowed with a warning.
+            if setup and start:
+                if setup >= start:
+                    errors.append("field_day: setup must start before operations start "
+                                  "(change Setup start, or clear it for local midnight)")
+                elif (start - setup).total_seconds() > 72 * 3600:
+                    warnings.append("field_day: setup starts more than 3 days before operations")
 
     sources = changes.get("sources")
     if sources is not None:

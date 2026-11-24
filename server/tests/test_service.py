@@ -295,6 +295,28 @@ class SystemInfo(unittest.TestCase):
         self.assertFalse(system_info.rtc(folder)["charging"])
         self.assertEqual(system_info.rtc(tempfile.mkdtemp()), {"battery_v": None, "charging": None})
 
+    def test_drive_kind(self):
+        # Paths as /sys/dev/block/<major>:<minor> resolves on a Pi 5 (2026-11-24).
+        nvme = "/sys/devices/platform/axi/1000110000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/nvme/nvme0/nvme0n1/nvme0n1p2"
+        sd = "/sys/devices/platform/axi/1000fff000.mmc/mmc_host/mmc0/mmc0:aaaa/block/mmcblk0/mmcblk0p2"
+        usb = "/sys/devices/platform/axi/1000120000.pcie/1f00200000.usb/xhci-hcd.0/usb1/1-1/1-1:1.0/host0/target0:0:0/0:0:0:0/block/sda/sda2"
+        sata = "/sys/devices/pci0000:00/0000:00:17.0/ata1/host0/target0:0:0/0:0:0:0/block/sda/sda1"
+        self.assertEqual([system_info.drive_kind(p) for p in (nvme, sd, usb, sata, None)],
+                         ["nvme", "microsd", "usb", "other", None])
+
+    def test_drive_block(self):
+        sys_block = tempfile.mkdtemp()
+        b = system_info.drive(root="/", sys_block=sys_block)
+        self.assertEqual((b["card_in_slot"], b["nvme_present"]), (False, False))
+        os.mkdir(os.path.join(sys_block, "nvme0n1"))
+        os.mkdir(os.path.join(sys_block, "mmcblk0"))
+        b = system_info.drive(root="/", sys_block=sys_block)
+        self.assertEqual((b["card_in_slot"], b["nvme_present"]), (True, True))
+        self.assertIn(b["root"], ("nvme", "microsd", "usb", "other", None))
+        gone = system_info.drive(root="/no/such/place", sys_block="/no/such/folder")
+        self.assertEqual(gone, {"root": None, "device": None, "card_in_slot": None, "nvme_present": None})
+        self.assertIn("drive", system_info.block("0.1.0", T0))
+
 
 class Endpoints(unittest.TestCase):
 

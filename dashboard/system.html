@@ -72,7 +72,8 @@
       <span class="help-head">THIS PI</span>
       <p><b>CPU temperature</b>: <b class="f">amber</b> "warm" from 75 °C, <b class="r">red</b> "hot" from 80 °C, where the Pi starts to slow itself down. Check the fan and keep the cage out of the sun.</p>
       <p><b>Power</b>: <b class="r">red</b> <b>Under-voltage now</b> means the supply can't keep up. Use the official 27 W supply, a short cable and the Jackery's AC outlet. <b class="f">Amber</b> means it happened since the last start.</p>
-      <p><b>Memory, disk, load, uptime</b>: for spotting trouble; normal is low.</p>
+      <p><b>Disk</b> names the drive the system is running from. <b class="f">Amber</b> <b>microSD SPARE</b> means the NVMe didn't boot and the Pi started from the backup card: everything works, but settings and saved state are as of the last backup. Fix or replace the NVMe when you're home (see the backup guide).</p>
+      <p><b>Memory, load, uptime</b>: for spotting trouble; normal is low.</p>
     </section>
     <section class="tile help-col">
       <span class="help-head">NETWORK · LOCATION · TIME</span>

@@ -65,6 +65,7 @@ async function save(change) {
   delete body.warnings;
   state.data.settings = body;
   if (body.display && body.display.main_clock) remember("hoc.mainClock", body.display.main_clock);
+  if (body.display) remember("hoc.cycling", body.display.panel_cycling === true);
   tickClock();
   renderStatusBar();
   render();
@@ -116,13 +117,23 @@ function renderFieldDay() {
   $("f-fd_start_time").textContent = timeText(fd.ops_start);
   $("f-fd_end_date").textContent = dateText(fd.ops_end);
   $("f-fd_end_time").textContent = timeText(fd.ops_end);
+  // Setup start (Dan, 2026-11-22): blank = local midnight on the operations day.
+  $("f-fd_setup_date").textContent = fd.setup_start ? dateText(fd.setup_start) : "Not set";
+  $("f-fd_setup_time").textContent = timeText(fd.setup_start);
   let note = "Setup counts down to the start of operations.";
   if (fd.ops_start && fd.ops_end) {
-    const loc = v => new Date(v.replace("Z", ":00Z")).toLocaleString("en-US",
-      {weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short"});
-    note += ` Local: ${loc(fd.ops_start)} to ${loc(fd.ops_end)}.`;
+    const opts = {weekday: "short", hour: "numeric", minute: "2-digit"};
+    const loc = v => new Date(v.replace("Z", ":00Z")).toLocaleString("en-US", opts).replace(",", "");
+    const zone = new Date(fd.ops_end.replace("Z", ":00Z")).toLocaleTimeString("en-US", {timeZoneName: "short"}).split(" ").pop();
+    // The service's own setup time (it knows the Pi's zone and checks Setup start).
+    const block = (state.data.system || {}).field_day || {};
+    const setup = fd.setup_start ? loc(fd.setup_start)
+      : block.setup_start ? `${new Date(block.setup_start).toLocaleString("en-US", opts).replace(",", "")} (midnight)` : "local midnight";
+    note = `Local: setup ${setup}, ops ${loc(fd.ops_start)} to ${loc(fd.ops_end)} ${zone}.`;
   }
+  note += " Setup start left blank = local midnight on the ops day.";
   $("fd-local").textContent = note;
+  $("fd-rule").hidden = !fdOn;       // the ARRL 24-hour rule (2026-11-22), with the Field Day profile on
 }
 
 function renderProfile() {
@@ -209,6 +220,8 @@ function renderDisplay() {
       ? "Saved, but this Pi can't change the screen's brightness yet (the brightness permission isn't installed)."
       : "--";
   }
+  press("pc-off", d.panel_cycling !== true);
+  press("pc-on", d.panel_cycling === true);
   press("ns-dim", d.night_style !== "red");
   press("ns-red", d.night_style === "red");
   $("f-night_start").textContent = d.night_start || "--";
@@ -259,6 +272,13 @@ function renderFieldLightning() {
   press("fl-full", level === "full");
   press("fl-economy", level === "economy");
   const sys = (state.data.system || {}).satellite_lightning;
+  // At-home test (Dan, 2026-11-23): replaces the SSH curl commands. Home Mode only.
+  const testOn = !!(sys && sys.home_test);
+  press("ht-off", !testOn);
+  press("ht-on", testOn);
+  $("ht-on").disabled = field || !sys;
+  $("ht-on-soon").hidden = !field;
+  $("ht-off").disabled = !sys;
   const used = sys ? `Used today: ${dash(sys.mb_today)} MB${sys.running ? ` · ${dash(sys.mb_last_hour)} MB in the last hour` : ""}` : "--";
   const why = sys && sys.reader === false ? " · can't read satellite files yet (python3-netcdf4 not installed)" : "";
   $("fl-used").textContent = used + why;
@@ -441,6 +461,8 @@ $("op-gen").addEventListener("click", () => { if (settings().profile === "field_
 $("op-fd").addEventListener("click", () => { if (settings().profile !== "field_day") saveOrSay({profile: "field_day"}); });
 $("mc-utc").addEventListener("click", () => { if (mainClock() !== "utc") saveOrSay({display: {main_clock: "utc"}}); });
 $("mc-local").addEventListener("click", () => { if (mainClock() !== "local") saveOrSay({display: {main_clock: "local"}}); });
+$("pc-on").addEventListener("click", () => { if (display().panel_cycling !== true) saveOrSay({display: {panel_cycling: true}}); });
+$("pc-off").addEventListener("click", () => { if (display().panel_cycling === true) saveOrSay({display: {panel_cycling: false}}); });
 $("ns-dim").addEventListener("click", () => saveOrSay({display: {night_style: "dim"}}));
 $("ns-red").addEventListener("click", () => saveOrSay({display: {night_style: "red"}}));
 $("red-preview").addEventListener("click", () => previewRed(10));
@@ -451,6 +473,14 @@ $("fl-on").addEventListener("click", async () => {
 $("fl-off").addEventListener("click", async () => {
   const d = (satLightning() || {}).detection || {};
   if (d.on && !(await lightningAction("off"))) say("Lightning detection didn't turn off (the console service didn't answer).", "bad");
+});
+$("ht-on").addEventListener("click", async () => {
+  const sys = (state.data.system || {}).satellite_lightning;
+  if (sys && !sys.home_test && !(await lightningAction("home_test_on"))) say("The at-home test didn't start (the console service didn't accept it).", "bad");
+});
+$("ht-off").addEventListener("click", async () => {
+  const sys = (state.data.system || {}).satellite_lightning;
+  if (sys && sys.home_test && !(await lightningAction("home_test_off"))) say("The at-home test didn't stop (the console service didn't answer).", "bad");
 });
 $("fl-full").addEventListener("click", () => saveOrSay({field_lightning: {level: "full"}}));
 $("fl-economy").addEventListener("click", () => saveOrSay({field_lightning: {level: "economy"}}));
@@ -630,7 +660,10 @@ const fdDate = v => v ? new Date(v.replace("Z", ":00Z")) : null;
 const pad2 = n => String(n).padStart(2, "0");
 
 function dpValue() { return `${dp.y}-${pad2(dp.m + 1)}-${pad2(dp.d)}T${pad2(dp.hh)}:${pad2(dp.mm)}Z`; }
+/* The time this one is checked against: the end against the start, the start against the
+   end, and Setup start (2026-11-24) against Ops start. */
 function dpOtherKey() { return dp.key === "ops_start" ? "ops_end" : "ops_start"; }
+const DP_TITLES = {ops_start: "Operations start", ops_end: "Operations end", setup_start: "Setup start"};
 
 function openPicker(key) {
   dp.key = key;
@@ -639,10 +672,12 @@ function openPicker(key) {
   const other = fdDate(fd[dpOtherKey()]);
   if (!t && key === "ops_end" && other) t = new Date(other.getTime() + 24 * 3600e3);   // a day after the start
   if (!t && key === "ops_start" && other) t = new Date(other.getTime() - 24 * 3600e3);
+  if (!t && key === "setup_start" && other) t = new Date(other.getTime() - 4 * 3600e3);  // an easy setup, 4 h ahead
   if (!t) { const n = new Date(); t = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), 19, 0)); }
   dp.y = t.getUTCFullYear(); dp.m = t.getUTCMonth(); dp.d = t.getUTCDate();
   dp.hh = t.getUTCHours(); dp.mm = t.getUTCMinutes() - t.getUTCMinutes() % 5;
-  $("dp-title").textContent = key === "ops_start" ? "Operations start" : "Operations end";
+  $("dp-title").textContent = DP_TITLES[key];
+  $("dp-clear").hidden = !(key === "setup_start" && fd.setup_start);
   $("dp-error").textContent = "";
   renderPicker();
   $("dp").hidden = false;
@@ -692,8 +727,12 @@ function renderPicker() {
   let ok = true;
   if (other) {
     const hours = (dp.key === "ops_end" ? t - other : other - t) / 3600e3;
-    if (hours <= 0) { line += " · ends before it starts"; ok = false; }
-    else line += ` · operations last ${Number.isInteger(hours) ? hours : hours.toFixed(1)} h`;
+    const hText = Number.isInteger(hours) ? hours : hours.toFixed(1);
+    if (dp.key === "setup_start") {
+      if (hours <= 0) { line += " · must be before operations start"; ok = false; }
+      else line += ` · ${hText} h before operations`;
+    } else if (hours <= 0) { line += " · ends before it starts"; ok = false; }
+    else line += ` · operations last ${hText} h`;
   }
   $("dp-local").textContent = line;
   $("dp-local").classList.toggle("warn", !ok);
@@ -716,6 +755,11 @@ for (const b of document.querySelectorAll("#dp-quick button")) {
   b.addEventListener("click", () => { dp.hh = Number(b.dataset.h); dp.mm = 0; renderPicker(); });
 }
 $("dp-cancel").addEventListener("click", () => { $("dp").hidden = true; dp.key = null; });
+$("dp-clear").addEventListener("click", async () => {     // Setup start back to local midnight
+  const res = await save({field_day: {setup_start: null}});
+  if (res.ok) { $("dp").hidden = true; dp.key = null; }
+  else $("dp-error").textContent = res.errors.map(plain).join(" ");
+});
 $("dp-set").addEventListener("click", async () => {
   $("dp-set").disabled = true;
   const res = await save({field_day: {[dp.key]: dpValue()}});
@@ -723,7 +767,8 @@ $("dp-set").addEventListener("click", async () => {
   else { $("dp-error").textContent = res.errors.map(plain).join(" "); $("dp-set").disabled = false; }
 });
 for (const [id, key] of [["f-fd_start_date", "ops_start"], ["f-fd_start_time", "ops_start"],
-                         ["f-fd_end_date", "ops_end"], ["f-fd_end_time", "ops_end"]]) {
+                         ["f-fd_end_date", "ops_end"], ["f-fd_end_time", "ops_end"],
+                         ["f-fd_setup_date", "setup_start"], ["f-fd_setup_time", "setup_start"]]) {
   $(id).addEventListener("click", () => openPicker(key));
 }
 $("kb-cancel").addEventListener("click", closeKeyboard);

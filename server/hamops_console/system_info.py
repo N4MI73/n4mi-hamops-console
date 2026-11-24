@@ -11,6 +11,11 @@ block adds `reporting`, `grid_accepted_at`, `position_grid`, `grid_pending`,
 2026-11-10, for the System page: memory in GB, the Wi-Fi signal (from
 NetworkManager's last scan, never starting a new one) and the real-time
 clock's backup battery.
+
+2026-11-24 (Dan, 2026-11-23): `drive`, which drive the system is running from (the
+NVMe, or the microSD spare when the NVMe didn't boot) and whether a card is in the
+slot. If the NVMe fails in the field the Pi boots the spare by itself, and this is
+the only sign of it. The System page shows it in the Disk row (amber on the spare).
 """
 
 import glob
@@ -114,6 +119,53 @@ def disk():
     return round(usage.used / gb, 1), round(usage.total / gb)
 
 
+def _block_device(st_dev):
+    """The /sys/class/block folder for a device number, e.g. .../nvme0n1/nvme0n1p2."""
+    try:
+        return os.path.realpath(f"/sys/dev/block/{os.major(st_dev)}:{os.minor(st_dev)}")
+    except (OSError, ValueError):
+        return None
+
+
+def drive_kind(sys_path):
+    """'nvme', 'microsd', 'usb' or 'other' from a block device's /sys path; None if unknown.
+
+    The name says NVMe or SD card (mmcblk); a USB drive is told apart from other sd*
+    disks by its /sys path, so a development PC's SATA disk isn't called a USB drive."""
+    if not sys_path:
+        return None
+    name = os.path.basename(sys_path)
+    if name.startswith("nvme"):
+        return "nvme"
+    if name.startswith("mmcblk"):
+        return "microsd"
+    if "/usb" in sys_path:
+        return "usb"
+    return "other"
+
+
+def drive(root="/", sys_block="/sys/block"):
+    """Which drive the system is running from, and what else is fitted.
+
+    `root` is the drive the running system is on; `card_in_slot` is whether a microSD
+    card is in the slot (its block device only exists while a card is in); `nvme_present`
+    whether the Pi sees an NVMe drive at all. Each is None when it can't be told."""
+    try:
+        path = _block_device(os.stat(root).st_dev)
+    except OSError:
+        path = None
+    try:
+        names = os.listdir(sys_block)
+    except OSError:
+        names = None
+    return {
+        "root": drive_kind(path),
+        "device": os.path.basename(path) if path else None,
+        "card_in_slot": None if names is None else any(n.startswith("mmcblk") for n in names),
+        "nvme_present": None if names is None else any(n.startswith("nvme") for n in names),
+    }
+
+
 def network():
     """Active NetworkManager connection (its profile name, never a password),
     the device and the Pi's address."""
@@ -202,6 +254,7 @@ def block(version, started_at, now=None):
         "memory_total_gb": mem_total,
         "disk_used_gb": used,
         "disk_total_gb": total,
+        "drive": drive(),
         "power": throttle_flags(),
         "network": network(),
         "clock": clock(),

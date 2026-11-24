@@ -83,13 +83,15 @@ function renderHelp(p) {
   if (fd) {
     $("help-lead").textContent = "Field Day scale: North America reach on the Field Day bands (no WARC), right now:";
     add("g", "GOOD", fd.good); add("f", "FAIR", fd.fair); add("p", "POOR", fd.poor);
-    $("help-meanings").append(document.createTextNode("6m always reads POOR (openings can't be forecast). Not yet checked against June (ARRL Field Day)."));
+    $("help-meanings").append(document.createTextNode("6m always reads POOR (openings can't be forecast)."));
   } else {
     $("help-lead").textContent = "GOOD · FAIR · POOR for each band, right now:";
     add("g", "GOOD", "DX is workable on SSB.");
     add("f", "FAIR", "DX on FT8 only, or North America only on SSB. DX is often workable on FT8 even when SSB is quiet or North America only.");
     add("p", "POOR", "North America only, or nothing, even on FT8.");
   }
+  // Dan, 2026-11-22: WFD allows no FT8 or FT4, and part of the data behind the scale is FT8 reports.
+  $("help-fd-head").hidden = $("help-fd").hidden = !fd;
   $("help-source").textContent = p && p.source && p.source !== "PropMon"
     ? "In Field Mode this Pi rates the bands itself with PropMon's model: solar flux and K from HamQSL, NOAA's storm history, and the time of day at the grid square named under the bands. A guide to where to listen first."
     : "The ratings come from PropMon on the home server, worked out from solar flux, the K index and the time of day at the grid square named under the bands. They describe how open each band is in general, not a path to one place.";

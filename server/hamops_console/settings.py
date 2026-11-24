@@ -32,11 +32,13 @@ DEFAULTS = {
         "night_brightness_pct": 20,
         "night_start": "22:00",
         "night_end": "07:00",
+        "panel_cycling": False,       # Home -> Propagation -> Weather, 60 s each (2026-11-22)
     },
     "profile": "general_hf",          # "general_hf" or "field_day" (2026-11-12)
     "field_day": {                    # operations start and end, UTC, e.g. "2027-01-30T19:00Z"
         "ops_start": None,
         "ops_end": None,
+        "setup_start": None,          # None = local midnight on the operations day (2026-11-22)
     },
     "sources": {
         "propmon_url": "",
