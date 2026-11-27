@@ -202,12 +202,43 @@
 
   <footer class="toolbar">
     <button class="st-done" id="done">Done</button>
-    <button disabled>Help<span class="soon">Coming</span></button>
+    <button id="help-open">Help</button>
     <span class="st-msg" id="msg" role="status"></span>
     <div class="spacer"></div>
     <button class="shutdown" id="shutdown">Shut down…</button>
   </footer>
 
+</div>
+
+<!-- Help (the approved Help style of 2026-11-13; added 2026-11-27) -->
+<div class="help" id="help" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+  <div class="help-top"><span class="help-title" id="help-title">Help · Settings</span><span class="help-hint">What each tab sets, and how changes are saved</span></div>
+  <div class="help-cols">
+    <section class="tile help-col">
+      <span class="help-head">STATION &amp; PROFILE</span>
+      <p><b>Data source</b>: <b>Home</b> reads PropMon and the home weather station in the shack. <b>Field</b> uses this Pi and the internet (a phone hotspot). You switch it; the console never switches by itself.</p>
+      <p><b>Station</b>: Home and Field each keep their own callsign and grid. In Field Mode use a 6-character grid: a 4-character square is too big for NWS alerts. <b>GPS</b> (Field only) sets the grid once the same square has held for 2 minutes.</p>
+      <p><b>Operating profile</b>: Field Day adds the timer to the status bar and, in Field Mode, rates the Field Day bands for North America. Alerts are the same in both.</p>
+      <p><b>Field Day times</b> are in UTC, set with the picker. Setup start left blank means local midnight on the operations day.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">DISPLAY</span>
+      <p><b>Main clock</b>: UTC or local shown first everywhere. Tapping the big time in the status bar swaps them too.</p>
+      <p><b>Brightness</b>: one level by day, one at night (between the night times, local). <b>Red</b> night style turns the screen red to protect night vision; alerts then rely on their words and the flashing border.</p>
+      <p><b>Panel cycling</b>: Home, Propagation and Weather in turn. A touch pauses it; a critical alert holds Home until acknowledged.</p>
+      <span class="help-head">WI-FI</span>
+      <p>When several saved networks are in range, the one highest in the list is joined. The arrows change the order; <b>Forget</b> takes two taps. <b>Join</b> a nearby network and type its password on the keyboard.</p>
+    </section>
+    <section class="tile help-col">
+      <span class="help-head">DATA SOURCES</span>
+      <p><b>Home addresses</b>: PropMon and Weather Sentinel on the home network. <b>Test connections</b> tries each one, and NWS, and says what answered.</p>
+      <p><b>Weather radio list</b>: stored on this Pi for use with no internet. <b>Update now</b> at home before a field trip.</p>
+      <p><b>Field lightning detection</b>: <b>Full</b> about 60 MB an hour, <b>Economy</b> about 20. It turns itself off when the NWS outlook clears. The <b>at-home test</b> compares the satellite with the Tempest, on the System page only.</p>
+      <span class="help-head">SAVING</span>
+      <p>Every change is saved at once. A value that doesn't fit is refused with the reason, and nothing is saved.</p>
+    </section>
+  </div>
+  <div class="help-actions"><button class="help-close" id="help-close">Close</button></div>
 </div>
 
 <!-- On-screen keyboard (approved 2026-11-05 with the Wi-Fi join screen) -->
