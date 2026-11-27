@@ -8,8 +8,12 @@ priority, not the product type. Checked in this order:
                      isn't mistaken for wind)
   2. site_hazard  -- tornado, thunderstorm, wind, flood, hurricane, tropical
                      storm, storm surge, or a Special Weather Statement
-  3. other        -- everything else (Freeze Warning, Winter Storm Warning,
-                     Red Flag Warning, Dense Fog Advisory, ...)
+  3. winter       -- winter storm, ice storm, blizzard, snow squall (Dan,
+                     2026-11-27, for Winter Field Day): their warnings go on the
+                     Priority Card in amber, not critical; their watches and
+                     advisories stay with the other notices
+  4. other        -- everything else (Freeze Warning, Red Flag Warning,
+                     Dense Fog Advisory, ...)
 
 The word lists below are the one place to change; adding a hazard is a
 one-line edit. Matching is on whole words, case-insensitive.
@@ -24,6 +28,7 @@ TEMPERATURE_WORDS = ["heat", "cold", "wind chill"]
 SITE_HAZARD_WORDS = ["tornado", "thunderstorm", "wind", "flood", "hurricane",
                      "tropical storm", "storm surge"]
 SITE_HAZARD_EVENTS = ["special weather statement"]
+WINTER_WORDS = ["winter storm", "ice storm", "blizzard", "snow squall"]
 
 
 def _has_word(text, words):
@@ -44,4 +49,6 @@ def hazard_class(event):
         return "temperature"
     if text.strip() in SITE_HAZARD_EVENTS or _has_word(text, SITE_HAZARD_WORDS):
         return "site_hazard"
+    if _has_word(text, WINTER_WORDS):
+        return "winter"
     return "other"

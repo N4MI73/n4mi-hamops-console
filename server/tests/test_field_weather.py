@@ -100,7 +100,7 @@ class Alerts(unittest.TestCase):
         watch = next(i for i in block["items"] if i["event"] == "Winter Storm Watch")
         self.assertEqual(watch["ends"], "2026-11-20T12:00:00Z")
         self.assertEqual(watch["expires"], "2026-11-16T20:00:00Z")
-        self.assertEqual((watch["kind"], watch["hazard_class"]), ("watch", "other"))
+        self.assertEqual((watch["kind"], watch["hazard_class"]), ("watch", "winter"))
         self.assertTrue(watch["hazard"].startswith("For the Winter Weather Advisory"))
 
     def test_point_query_and_fetch_interval(self):

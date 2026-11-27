@@ -338,4 +338,8 @@ html.night-red .cell span { font-size: 22px; font-weight: 800; }
 .cyc-words { display: flex; flex-direction: column; gap: 2px; }
 .cyc-status .cyc-head { font-size: 15px; font-weight: 600; letter-spacing: 0.1em; color: #9CCBFF; }
 .cyc-line { font-size: 18px; color: var(--ink); white-space: nowrap; }
-.toolbar button.cyc-resume { min-width: 0; padding: 0 14px; white-space: nowrap; font-weight: 700; color: #FFFFFF; background: #17212C; border: 2px solid var(--info); }
+.toolbar button.cyc-resume { min-width: 0; padding: 0 16px; white-space: nowrap; font-weight: 700; color: #FFFFFF; background: #17212C; border: 2px solid var(--info); flex-shrink: 0; }
+/* With the cycling box showing, the plain buttons give up a little width so Resume normal
+   mode keeps its padding beside Help on Propagation and Weather (warnings audit, 2026-11-27;
+   Dan's photo of 2026-11-24 showed the text touching the button edges). */
+.toolbar:has(.cyc-status:not([hidden])) button:not(.shutdown):not(.cyc-resume) { min-width: 132px; }

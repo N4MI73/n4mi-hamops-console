@@ -353,9 +353,17 @@ class WeatherSource:
         raw = self._raw or {}
         lightning = _dict(raw.get("lightning"))
         test = self._simulation()
+        # The strikes come from the Tempest: while it isn't reporting, "no strikes" means
+        # nothing, so the lightning data is late too, as the conditions are (warnings audit,
+        # 2026-11-27: before, Sentinel answering kept it "ok" and read as an all-clear).
+        tempest = _dict(raw.get("tempest"))
+        error, force_stale = self._error, False
+        if self._raw is not None and lightning is not None and (tempest is None or tempest.get("available") is not True):
+            error, force_stale = "Home weather station (Tempest) not reporting: lightning can't be detected", True
         out = freshness.block(
             SOURCE, self._fetched_at if lightning is not None or self._raw is None else None,
-            None, self._t("lightning_stale_min") * 60, error=self._error, now=now, test=test)
+            None, self._t("lightning_stale_min") * 60, error=error, now=now, test=test,
+            force_stale=force_stale)
         if self._raw is not None and lightning is None:
             out["message"] = f"{SOURCE} sent no lightning information"
         if test:
@@ -364,6 +372,10 @@ class WeatherSource:
         cleared = self._state.cleared_at
         if cleared is not None and now - cleared < timedelta(hours=CLEARED_SHOWN_HOURS):
             out["cleared_at"] = freshness.iso(cleared)
+        if not test:
+            out.update(self._console_hold(now))   # the console's own 5-mile hold, whatever Sentinel's state
+            if out["status"] != freshness.OK and out["within_5mi"] is False:
+                out["within_5mi"] = None          # late or missing data: unknown, never "none"
         if lightning is None or out["status"] == freshness.UNAVAILABLE:
             return out
         close = _dict(lightning.get("close")) or {}
@@ -382,20 +394,30 @@ class WeatherSource:
         })
         if test:
             return out  # flags stay null: a simulated strike must not raise an alert
-        hold_until = self._state.hold_5mi_until
-        within_5 = hold_until is not None and now < hold_until
+        if out["status"] != freshness.OK:
+            # Late data (warnings audit, 2026-11-27): Sentinel's last snapshot can't say whether
+            # lightning is near now. Its 10-mile hold still stands until its time runs out;
+            # "frequent" is unknown; "none" is never concluded (null, not false).
+            ten = (not old_close) and hold_10 is not None and now < hold_10
+            out.update({"within_10mi": True if ten else None, "frequent": None,
+                        "hold_until_10mi": freshness.iso(hold_10) if ten else None})
+            return out
         out.update({
             "within_10mi": False if old_close and close.get("active") is True else _bool(close.get("active")),
-            "within_5mi": within_5,
             "frequent": (None if per_minute is None
                          else (not old_close) and per_minute > self._t("lightning_frequent_per_min")),
             "hold_until_10mi": None if old_close else freshness.iso(hold_10),
-            "hold_until_5mi": freshness.iso(hold_until) if within_5 else None,
-            # When this 5-mile hold began (contracts 0.4), so the alert list can
-            # flash once per hold and key Acknowledge on it.
-            "hold_since_5mi": freshness.iso(self._state.hold_5mi_since) if within_5 else None,
         })
         return out
+
+    def _console_hold(self, now):
+        """The console's own 5-mile hold (kept on the Pi): within_5mi, its end and when it
+        began (contracts 0.4: the alert list flashes once per hold and keys Acknowledge on it)."""
+        hold_until = self._state.hold_5mi_until
+        within_5 = hold_until is not None and now < hold_until
+        return {"within_5mi": within_5,
+                "hold_until_5mi": freshness.iso(hold_until) if within_5 else None,
+                "hold_since_5mi": freshness.iso(self._state.hold_5mi_since) if within_5 else None}
 
     def _location(self):
         mode = self.settings["mode"]

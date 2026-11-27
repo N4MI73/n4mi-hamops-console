@@ -213,7 +213,7 @@ The **centre of the current mode's grid** locates the console for NWS. A 4-chara
 | `id` | NWS alert id. Acknowledge is keyed on it |
 | `event` | NWS event name |
 | `kind` | `warning`, `watch`, `advisory` or `statement`, from the event name |
-| `hazard_class` | `site_hazard`, `temperature` or `other`, below |
+| `hazard_class` | `site_hazard`, `temperature`, `winter` or `other`, below |
 | `severity` | NWS CAP severity |
 | `headline` | One line of what's happening. Home: Sentinel's `what`, else its `headline`. Field: NWS `parameters.NWSheadline`, else `headline` |
 | `hazard` | The short HAZARD line. Home: Sentinel's `hazard`. Field: the same extraction, ported from Sentinel |
@@ -226,7 +226,8 @@ The **centre of the current mode's grid** locates the console for NWS. A 4-chara
 **`hazard_class`: the hazard to the operating location decides priority, not the product type.** Matched on whole words in the event name, in this order:
 1. `temperature`: heat, cold or wind chill. Checked first, so "Wind Chill" isn't taken for wind.
 2. `site_hazard`: tornado, thunderstorm, wind, flood, hurricane, tropical storm, storm surge, or a Special Weather Statement.
-3. `other`: everything else (Freeze Warning, Winter Storm Warning, Red Flag Warning, Dense Fog Advisory, ...).
+3. `winter` (27 November 2026, Dan, for Winter Field Day): winter storm, ice storm, blizzard, snow squall.
+4. `other`: everything else (Freeze Warning, Winter Weather Advisory, Red Flag Warning, Dense Fog Advisory, ...).
 
 The word lists live in one file in the service.
 
@@ -291,6 +292,8 @@ The word lists live in one file in the service.
 - **Recorded:** `cleared_at` is kept for 24 hours, and the Alerts page shows "Lightning hold cleared by operator at 3:20 PM (20:20 UTC)".
 
 **In Sentinel's simulation:** `status` is `test`, every flag is `null`, and simulated strikes never start a hold.
+
+**When the data is late or missing (warnings audit, 27 November 2026).** Lightning comes from the Tempest, so the block is `stale` (message "Home weather station (Tempest) not reporting: lightning can't be detected") whenever Sentinel's `tempest.available` isn't `true`, as well as when Sentinel stops answering. While `stale` or `unavailable`: `within_5mi` still comes from the console's own hold (it is kept on the Pi and ends by time or Clear), with `hold_until_5mi` and `hold_since_5mi`; `within_10mi` is `true` only while Sentinel's last 10-mile hold time (`hold_until_10mi`) is still ahead; every flag that can't be known is `null`, never `false`; `frequent` is `null`. Before this, the block stayed `ok` while the Tempest was silent (reading as no lightning), and the alert list ignored a running 5-mile hold once the block went stale.
 
 ### Lightning, Field Mode (`lightning`, GOES satellite; built 20 November 2026)
 
@@ -485,18 +488,20 @@ The ranked list behind the Priority Card and the Alerts page, built by the servi
 | 7 | `lightning_10mi` | `within_10mi` (both modes) | yellow | card | no |
 | 8 | `lightning_20mi` | `within_20mi` (Field, GOES satellite; 20 November 2026) | yellow (amber) | card | no |
 | 9 | `lightning_off_recent` | Field detection turned off with `recent_at_off` (§5); carries `"action": "lightning_on"` | yellow | card | no |
-| 10 | `lightning_outlook` | `lightning_outlook` possible, or likely more than 2 h out | yellow | card | no |
-| 11 | `source_down` | A source stale, unavailable, **or in test mode** (one item per source). **The NWS alerts card comes first among these** (5 November 2026) | yellow | card | no |
-| 12 | `propagation` | Notable propagation (below) | green (good) / yellow (bad) | card | no |
-| 13 | `all_quiet` | No other card item | green | card | no |
+| 10 | `winter_warning` | NWS warning with `hazard_class` = `winter` (27 November 2026) | yellow | card | no |
+| 11 | `lightning_outlook` | `lightning_outlook` possible, or likely more than 2 h out | yellow | card | no |
+| 12 | `source_down` | A source stale, unavailable, **or in test mode** (one item per source). **The NWS alerts card comes first among these** (5 November 2026) | yellow | card | no |
+| 13 | `propagation` | Notable propagation (below) | green (good) / yellow (bad) | card | no |
+| 14 | `all_quiet` | No other card item | green | card | no |
 | — | `temperature_alert` | Any NWS product with `hazard_class` = `temperature` | yellow | badge | no |
 | — | `other_warning` | NWS warning with `hazard_class` = `other` | blue | badge | no |
-| — | `other_notice` | NWS advisory or statement with `hazard_class` = `other` | blue | badge | no |
+| — | `other_notice` | NWS advisory or statement with `hazard_class` = `other`, or a watch, advisory or statement with `hazard_class` = `winter` | blue | badge | no |
 
-- **One detected-lightning item at a time:** the highest that applies (5 mi beats frequent beats 10 mi beats 20 mi). Home lightning data is used only when its block is `ok`; **Field (GOES) lightning whenever detection is on**, because the block sets a tier only from flashes actually seen and a flash already seen keeps its hold when newer files are late. One forecast-lightning item can appear as well.
+- **One detected-lightning item at a time:** the highest that applies (5 mi beats frequent beats 10 mi beats 20 mi). Home lightning data is used in full when its block is `ok`; while it is `stale` or `unavailable`, only a running hold counts (the 5-mile item with "Lightning data late; hold kept.", or the 10-mile item while its hold time lasts; 27 November 2026); **Field (GOES) lightning whenever detection is on**, because the block sets a tier only from flashes actually seen and a flash already seen keeps its hold when newer files are late. One forecast-lightning item can appear as well.
 - **Field lightning wording (20 November 2026; shortened the same day so the Priority Card shows it whole):** `lightning_20mi` is "Lightning within 20 mi · 14 mi WSW" with "At 22:41 UTC (6:41 PM). 6 flashes in 10 min. Check your lightning app."; the 10- and 5-mile items read "Lightning 8.2 mi WSW" with the flash count and the Wait / Stay in time; the frequent item reads "Frequent lightning inside 10 mi" with the closest flash, the count and the Wait time (added 21 November 2026). The card's label names the GOES satellite. `lightning_off_recent` is "Lightning detection off" with "Strikes within 20 mi at 22:41 UTC (6:41 PM). Not an all-clear." The 5-mile item is critical and flashes once per hold, as at home.
 - **Field lightning switched off:** while detection is off, the forecast-lightning item carries `"action": "lightning_on"` (the Turn on lightning detection button on the card). A switched-off block (`status` `off`) never makes a `source_down` card. When detection is on and its files are late, the `source_down` card is "Lightning data late" (stale) or "Lightning data unavailable", with "Not the same as no lightning."; none while `detection.starting`.
 - **The keep-on question is not an alert item.** It is `lightning.detection.question` (§5); the screen shows it as a popup, never over a flashing critical alert.
+- **`alerts_unavailable_storms` wording (27 November 2026):** "NWS alerts out of date — storms forecast" while the NWS alerts block is `stale`, "NWS alerts unavailable — storms forecast" while it is `unavailable`.
 - **Stale NWS alerts are still ranked**, beside a `source_down` card saying the alerts are stale. After 30 minutes they're unavailable and drop out.
 - **NWS alerts outage (5 November 2026).** When the `alerts` block is stale or unavailable, its `source_down` card is titled "NWS alerts out of date" or "NWS alerts unavailable" (not the source's name, since in Home Mode Sentinel may be answering while it can't reach NWS), its detail is the block's `message` followed by "Not the same as no alerts.", its `ref.id` is `source-nws-alerts`, and it comes before the other `source_down` cards whatever their `since`. Other blocks from the same source fold into that one card, as before.
 - **Sentinel test mode** shows as a `source_down` card titled "Home weather station in test mode". Otherwise the card could read "All quiet." while real alerts can't pass through.

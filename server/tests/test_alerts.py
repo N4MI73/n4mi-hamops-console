@@ -160,9 +160,37 @@ class Lightning(unittest.TestCase):
         self.assertEqual((item["category"], item["title"]), ("lightning_10mi", "Lightning 8.2 mi away"))
         self.assertIn("Wait until 15:20 UTC (10:20 AM)", item["detail"])
 
-    def test_stale_lightning_not_used(self):
-        w = weather(lightning=dict(QUIET_LIGHTNING, within_5mi=True))
+    def test_stale_lightning_keeps_holds_only(self):
+        """Warnings audit (2026-11-27): while Sentinel's data is late, a running hold still
+        stands (red 5-mile card, flashing, same id); nothing new is concluded from old data."""
+        l = dict(QUIET_LIGHTNING, within_5mi=True, hold_until_5mi="2026-11-01T15:21:00Z",
+                 hold_since_5mi="2026-11-01T14:51:00Z", frequent=None, within_10mi=True)
+        w = weather(lightning=l)
         w["lightning"]["status"] = "stale"
+        items = build(w=w)
+        self.assertEqual(cats(items)[:1], ["lightning_5mi"])
+        five = items[0]
+        self.assertTrue(five["critical"])
+        self.assertEqual(five["ref"]["id"], "lightning-5mi-2026-11-01T14:51:00Z")
+        self.assertIn("Stay in until 15:21 UTC", five["detail"])
+        self.assertIn("data late", five["detail"])
+        self.assertIn("source_down", cats(items))
+        source = next(i for i in items if i["category"] == "source_down")
+        self.assertIn("Not the same as no lightning.", source["detail"])
+        # 10-mile hold time still running, no 5-mile hold: the amber 10-mile card.
+        w["lightning"].update(within_5mi=None, hold_until_5mi=None, hold_since_5mi=None,
+                              hold_until_10mi="2026-11-01T15:10:00Z")
+        self.assertEqual(cats(build(w=w))[:1], ["lightning_10mi"])
+        # Holds run out (or none): no lightning card at all, never an all-clear.
+        w["lightning"].update(within_10mi=None, hold_until_10mi=None)
+        self.assertFalse(any(c.startswith("lightning") for c in cats(build(w=w))))
+        # Unavailable (e.g. the service restarted while Sentinel was down): same rule.
+        w["lightning"].update(status="unavailable", within_5mi=True, hold_until_5mi="2026-11-01T15:21:00Z",
+                              hold_since_5mi="2026-11-01T14:51:00Z")
+        self.assertEqual(cats(build(w=w))[:1], ["lightning_5mi"])
+
+    def test_test_mode_lightning_never_used(self):
+        w = weather(lightning=dict(QUIET_LIGHTNING, within_5mi=True), test=True)
         self.assertNotIn("lightning_5mi", cats(build(w=w)))
 
     def test_forecast_levels(self):
@@ -190,6 +218,12 @@ class Sources(unittest.TestCase):
         self.assertEqual(cats(items), ["alerts_unavailable_storms", "lightning_outlook", "source_down"])
         self.assertEqual(items[0]["color"], "red")
         self.assertIn("not the same as no alerts", items[0]["detail"])
+
+    def test_alerts_out_of_date_with_storms_title(self):
+        o = {"level": "possible", "start": (NOW + timedelta(hours=1)).isoformat(), "basis": "forecast"}
+        items = build(w=weather(outlook=o, alerts_status="stale"))
+        self.assertEqual(items[0]["category"], "alerts_unavailable_storms")
+        self.assertEqual(items[0]["title"], "NWS alerts out of date — storms forecast")
 
     def test_storms_too_far_off(self):
         o = {"level": "possible", "start": (NOW + timedelta(hours=7)).isoformat(), "basis": "forecast"}
@@ -478,3 +512,28 @@ class EndedTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class Winter(unittest.TestCase):
+    """Dan, 2026-11-27 (for Winter Field Day): winter storm, ice storm, blizzard and snow
+    squall warnings go on the Priority Card in amber, not critical; their watches and
+    advisories stay on the badge."""
+
+    def test_winter_warning_on_card_not_critical(self):
+        items = build(w=weather([nws("Winter Storm Warning", "warning", "winter"),
+                                 nws("Winter Storm Watch", "watch", "winter")]))
+        first = items[0]
+        self.assertEqual((first["category"], first["color"], first["critical"], first["tier"]),
+                         ("winter_warning", "yellow", False, "card"))
+        watch = next(i for i in items if i["title"] == "Winter Storm Watch")
+        self.assertEqual((watch["category"], watch["tier"]), ("other_notice", "badge"))
+
+    def test_rank_after_detected_lightning_before_forecast_and_sources(self):
+        o = {"level": "possible", "start": (NOW + timedelta(hours=3)).isoformat(), "basis": "forecast"}
+        w = weather([nws("Ice Storm Warning", "warning", "winter"),
+                     nws("Wind Advisory", "advisory", "site_hazard")], outlook=o,
+                    lightning=dict(QUIET_LIGHTNING, within_10mi=True, closest_mi=8.0))
+        w["conditions"]["status"] = "stale"
+        self.assertEqual(cats(build(w=w)),
+                         ["hazard_alert", "lightning_10mi", "winter_warning", "lightning_outlook", "source_down"])
+

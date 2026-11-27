@@ -35,7 +35,8 @@ function tagFor(item) {
   const c = item.category;
   if (item.critical) return {text: "CRITICAL", outline: false};
   if (c === "hazard_alert") return {text: (item.kind || "alert").toUpperCase(), outline: false};
-  if (c === "alerts_unavailable_storms") return {text: "NWS DOWN", outline: false};
+  if (c === "winter_warning") return {text: "WARNING", outline: false};
+  if (c === "alerts_unavailable_storms") return {text: /out of date/.test(item.title || "") ? "NWS LATE" : "NWS DOWN", outline: false};
   if (c === "lightning_frequent" || c === "lightning_10mi" || c === "lightning_20mi") return {text: "LOCAL", outline: true};
   if (c === "lightning_off_recent") return {text: "DETECTION OFF", outline: true};
   if (c === "lightning_likely_soon" || c === "lightning_outlook") return {text: "FORECAST", outline: true};
@@ -53,7 +54,8 @@ function makeTag(item) {
 }
 
 /* An NWS product (warning, watch, advisory, statement), not a card about the NWS feed itself. */
-const NWS_PRODUCTS = new Set(["hazard_warning", "hazard_alert", "temperature_alert", "other_warning", "other_notice"]);
+const NWS_PRODUCTS = new Set(["hazard_warning", "hazard_alert", "winter_warning", "temperature_alert",
+                              "other_warning", "other_notice"]);
 function isNws(item) { return NWS_PRODUCTS.has(item.category); }
 function nwsCurrent() { return (state.data.alerts || {}).nws_alerts_status === "ok"; }
 function sourceName(item) {

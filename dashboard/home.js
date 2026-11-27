@@ -26,6 +26,7 @@ const LABELS = {
   alerts_unavailable_storms: "NWS ALERTS UNAVAILABLE", hazard_alert: "NWS",
   lightning_likely_soon: "LIGHTNING FORECAST", lightning_frequent: "LIGHTNING DETECTED · HOME TEMPEST",
   lightning_10mi: "LIGHTNING DETECTED · HOME TEMPEST", lightning_outlook: "LIGHTNING FORECAST",
+  winter_warning: "NWS · WINTER WARNING",
   source_down: "DATA SOURCE", propagation: "PROPAGATION", all_quiet: "RIGHT NOW",
 };
 // Field Mode lightning comes from the GOES satellite (2026-11-20), not the home Tempest.
@@ -78,6 +79,7 @@ function renderPriority() {
   const sat = satLightning();
   let label = (sat && SAT_LABELS[item.category]) || LABELS[item.category] || "RIGHT NOW";
   if (item.category === "hazard_alert") label = "NWS · WATCH OR ADVISORY";
+  if (item.category === "alerts_unavailable_storms" && /out of date/.test(item.title || "")) label = "NWS ALERTS OUT OF DATE";
   if (item.critical) label = "CRITICAL · " + label;
   if (item.acknowledged) label += " · ACKNOWLEDGED";
   $("p-label").textContent = label;
@@ -212,15 +214,31 @@ function renderLightningLine(l, fc) {
     text.textContent = `Lightning: ${outlookWords}`;
     return;
   }
-  if (l.status === "unavailable" || l.status === "test") {
-    setDot(dot, l.status === "test" ? "fair" : "bad");
-    text.textContent = l.status === "test" ? "Lightning: home station in test mode" : "Lightning: UNAVAILABLE";
+  if (l.status === "test") {
+    setDot(dot, "fair");
+    text.textContent = "Lightning: home station in test mode";
     return;
   }
-  const stale = l.status === "stale" ? " (STALE)" : "";
+  // Late or missing data: a hold already running still shows; otherwise never "no lightning"
+  // (warnings audit, 2026-11-27).
+  const late = l.status === "stale" || l.status === "unavailable";
+  if (late && !l.within_5mi && !l.within_10mi) {
+    setDot(dot, "bad");
+    text.textContent = l.status === "stale" ? "Lightning data out of date · not the same as no lightning"
+      : "Lightning: UNAVAILABLE";
+    return;
+  }
+  if (!late && !l.within_5mi && !l.within_10mi && l.within_10mi !== false) {
+    setDot(dot, "fair");                     // Sentinel didn't say: unknown, never "none"
+    text.textContent = "Lightning not known · not the same as no lightning";
+    return;
+  }
+  const stale = late ? " (STALE)" : "";
   if (l.within_5mi) {
     setDot(dot, "bad");
-    text.textContent = `Lightning ${dash(l.closest_mi)} mi · ${dash(l.strikes_recent)} in ${dash(l.window_min)} min${stale}`;
+    text.textContent = l.closest_mi != null
+      ? `Lightning ${l.closest_mi} mi · ${dash(l.strikes_recent)} in ${dash(l.window_min)} min${stale}`
+      : `Lightning inside 5 mi${stale}`;
   } else if (l.within_10mi) {
     setDot(dot, "fair");
     text.textContent = `Lightning ${dash(l.closest_mi)} mi · within 10 mi${stale}`;

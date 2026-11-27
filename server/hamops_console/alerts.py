@@ -16,11 +16,13 @@ find_worst_alert() lesson). Order approved 2026-10-12, extended by Dan
      8 lightning_20mi            Field: a flash inside 20 mi          yellow   (2026-11-20)
      9 lightning_off_recent      Field: detection turned off with flashes inside 20 mi
                                  in the last 30 minutes ("not an all-clear")   yellow
-    10 lightning_outlook         lightning possible, or likely later  yellow
-    11 source_down               a source stale, unavailable or in test mode           yellow
+    10 winter_warning            NWS Winter Storm, Ice Storm, Blizzard or Snow Squall
+                                 Warning (Dan, 2026-11-27)            yellow
+    11 lightning_outlook         lightning possible, or likely later  yellow
+    12 source_down               a source stale, unavailable or in test mode           yellow
                                  (NWS alerts first among these, 2026-11-05)
-    12 propagation               notable propagation                  green (good) / yellow (bad)
-    13 all_quiet                 nothing else on the card             green
+    13 propagation               notable propagation                  green (good) / yellow (bad)
+    14 all_quiet                 nothing else on the card             green
   badge tier (counted on the Alerts button)
      - temperature_alert         heat/cold product                    yellow
      - other_warning             other NWS warning                    blue
@@ -30,7 +32,10 @@ One detected-lightning item at a time (5 mi beats frequent beats 10 mi beats
 20 mi), and one forecast-lightning item; one of each can show together. Field
 Mode lightning (GOES satellite) is used while its block is ok or stale: a flash
 already seen keeps its hold when newer data is late, beside a "lightning data
-late" card. While Field detection is off, the forecast-lightning item carries
+late" card. Home Mode does the same for the holds (warnings audit, 2026-11-27):
+while Weather Sentinel's data is late or missing, the console's own 5-mile hold
+and Sentinel's last 10-mile hold time still stand, beside the "data is stale"
+card. While Field detection is off, the forecast-lightning item carries
 `"action": "lightning_on"` for the Turn on button. Within a
 category the newest comes first. The list is never empty.
 
@@ -63,7 +68,7 @@ ENDED_KEEP_HOURS = 24
 
 ORDER = ["hazard_warning", "lightning_5mi", "alerts_unavailable_storms", "hazard_alert",
          "lightning_likely_soon", "lightning_frequent", "lightning_10mi", "lightning_20mi",
-         "lightning_off_recent", "lightning_outlook",
+         "lightning_off_recent", "winter_warning", "lightning_outlook",
          "source_down", "propagation", "all_quiet",
          "temperature_alert", "other_warning", "other_notice"]
 BADGE = {"temperature_alert", "other_warning", "other_notice"}
@@ -118,6 +123,8 @@ def _nws_items(alerts):
             category, color = ("hazard_warning", "red") if kind == "warning" else ("hazard_alert", "yellow")
         elif cls == "temperature":
             category, color = "temperature_alert", "yellow"
+        elif cls == "winter" and kind == "warning":
+            category, color = "winter_warning", "yellow"
         else:
             category, color = ("other_warning", "blue") if kind == "warning" else ("other_notice", "blue")
         # "Until" is when the hazard ends (`ends`), never `expires` (when NWS will replace the
@@ -194,8 +201,10 @@ def _lightning_off_recent(lightning):
 def _detected_lightning(lightning):
     if lightning and lightning.get("source") == GOES:
         return _field_lightning(lightning)
-    if not lightning or lightning.get("status") != freshness.OK:
+    if not lightning or lightning.get("status") == freshness.TEST:
         return []
+    if lightning.get("status") != freshness.OK:
+        return _home_holds_while_late(lightning)
     closest = lightning.get("closest_mi")
     dist = f"{closest:g} mi away" if isinstance(closest, (int, float)) else "nearby"
     count = lightning.get("strikes_recent")
@@ -215,6 +224,28 @@ def _detected_lightning(lightning):
         until = freshness.parse_time(lightning.get("hold_until_10mi"))
         wait = f"Wait until {clock_text(until)}." if until else ""
         return [_item("lightning_10mi", f"Lightning {dist}", _join(strikes, wait),
+                      lightning.get("last_strike_at"), "weather.lightning", "lightning-10mi", "yellow")]
+    return []
+
+
+def _home_holds_while_late(lightning):
+    """Home Mode with Weather Sentinel's data late or missing (warnings audit, 2026-11-27):
+    a hold already running still stands. The 5-mile hold is the console's own (kept on the
+    Pi, ended by time or the operator's Clear); the 10-mile flag the weather block gives
+    while late is Sentinel's last hold time, still in the future. Nothing new is concluded
+    from old data: no frequent card, and no card at all once the holds run out (the "data
+    is stale" card says why)."""
+    late = "Lightning data late; hold kept."
+    if lightning.get("within_5mi"):
+        until = freshness.parse_time(lightning.get("hold_until_5mi"))
+        stay = f"Stay in until {clock_text(until)}." if until else ""
+        since = lightning.get("hold_since_5mi")
+        return [_item("lightning_5mi", "Lightning inside 5 mi", _join(stay, late), since,
+                      "weather.lightning", f"lightning-5mi-{since}", "red")]
+    if lightning.get("within_10mi"):
+        until = freshness.parse_time(lightning.get("hold_until_10mi"))
+        wait = f"Wait until {clock_text(until)}." if until else ""
+        return [_item("lightning_10mi", "Lightning inside 10 mi", _join(wait, late),
                       lightning.get("last_strike_at"), "weather.lightning", "lightning-10mi", "yellow")]
     return []
 
@@ -243,7 +274,9 @@ def _alerts_unavailable_storms(alerts, forecast, now, hours, tune):
     start = freshness.parse_time((outlook or {}).get("start"))
     if not outlook or (start is not None and start - now > timedelta(hours=hours)):
         return []
-    return [_item("alerts_unavailable_storms", "NWS alerts unavailable — storms forecast",
+    title = ("NWS alerts out of date — storms forecast" if alerts.get("status") == freshness.STALE
+             else "NWS alerts unavailable — storms forecast")
+    return [_item("alerts_unavailable_storms", title,
                   f"This is not the same as no alerts. {tune}",
                   None, "weather.alerts", "alerts-unavailable-storms", "red")]
 
@@ -258,13 +291,14 @@ def _source_down(blocks, tune="Tune NOAA Weather Radio."):
     ranked first among these cards (Dan, 2026-11-05): of all the things that can
     be down, not knowing about warnings matters most. Other blocks from the same
     source fold into it, as before, so one outage still gives one card."""
-    by_source = {}
+    by_source, late_names = {}, {}
     for name, block in blocks:
         if not block or block.get("status") in (freshness.OK, "off"):
             continue
         if (block.get("detection") or {}).get("starting"):
             continue              # just turned on: the first satellite file is on its way
         by_source.setdefault(block.get("source") or name, (name, block))
+        late_names.setdefault(block.get("source") or name, set()).add(name)
     out = []
     for source, (name, block) in by_source.items():
         status, message, id_ = block["status"], block.get("message"), f"source-{source}"
@@ -282,6 +316,10 @@ def _source_down(blocks, tune="Tune NOAA Weather Radio."):
             title = f"{source} data is stale"
         else:
             title = f"{source} unavailable"
+        if source != GOES and "weather.lightning" in late_names[source] and status != freshness.TEST:
+            # Home lightning folded into this card: say what it means (warnings audit, 2026-11-27).
+            message = _join(message + "." if message and not message.endswith(".") else message,
+                            "Not the same as no lightning.")
         if name == "weather.alerts":
             id_ = NWS_ALERTS_SOURCE_ID
         out.append(_item("source_down", title, message, block.get("fetched_at"),

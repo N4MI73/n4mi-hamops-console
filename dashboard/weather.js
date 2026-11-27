@@ -53,11 +53,24 @@ function renderLightningRow(l, fc) {
   act.hidden = true;
   if (l && l.source === "GOES satellite") { renderSatRow(l, outlook, act, !fc || fc.status === "unavailable"); return; }
 
-  if (l && (l.status === "ok" || l.status === "stale")) {      // Home Mode: the home Tempest
-    const stale = l.status === "stale" ? " (STALE)" : "";
+  // Home Mode: the home Tempest. A hold already running stands even when Sentinel's data is
+  // late or missing (warnings audit, 2026-11-27); late data never reads as "no lightning".
+  const homeLate = l && (l.status === "stale" || l.status === "unavailable");
+  if (homeLate && !l.within_5mi && !l.within_10mi) {
+    setRow("row-lightning", "bad", l.status === "stale" ? "Lightning data out of date" : "Lightning data unavailable",
+      `Not the same as no lightning · ${l.message || "Home Tempest"}${outlook ? " · " + outlookNote : ""}`);
+    return;
+  }
+  if (l && l.status === "ok" && !l.within_5mi && !l.within_10mi && l.within_10mi !== false) {
+    // Sentinel answered without saying whether lightning is near: unknown, never "none".
+    setRow("row-lightning", "fair", "Lightning not known", `Not the same as no lightning · Home Tempest${outlook ? " · " + outlookNote : ""}`);
+    return;
+  }
+  if (l && (l.status === "ok" || homeLate)) {
+    const stale = homeLate ? " (STALE)" : "";
     if (l.within_5mi) {
       // The time to stay in comes first in the note, so it's never the part that gets cut.
-      setRow("row-lightning", "bad", `Lightning ${dash(l.closest_mi)} mi${stale}`,
+      setRow("row-lightning", "bad", l.closest_mi != null ? `Lightning ${l.closest_mi} mi${stale}` : `Lightning inside 5 mi${stale}`,
         (l.hold_until_5mi ? `Stay in until ${mainTime(new Date(l.hold_until_5mi))} · ` : "")
         + `${dash(l.strikes_recent)} in ${dash(l.window_min)} min · Home Tempest`);
     } else if (l.within_10mi) {

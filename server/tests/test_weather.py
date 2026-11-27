@@ -149,7 +149,9 @@ class AlertClasses(unittest.TestCase):
             "Storm Surge Warning": "site_hazard", "Special Weather Statement": "site_hazard",
             "Wind Chill Advisory": "temperature", "Extreme Cold Warning": "temperature",
             "Heat Advisory": "temperature", "Extreme Heat Warning": "temperature",
-            "Freeze Warning": "other", "Winter Storm Warning": "other",
+            "Freeze Warning": "other", "Winter Storm Warning": "winter",
+            "Ice Storm Warning": "winter", "Blizzard Warning": "winter", "Snow Squall Warning": "winter",
+            "Winter Storm Watch": "winter", "Winter Weather Advisory": "other",
             "Red Flag Warning": "other", "Dense Fog Advisory": "other", "": "other",
         }
         for event, expected in cases.items():
@@ -353,6 +355,45 @@ class Failures(unittest.TestCase):
         reply["tempest"]["available"] = False
         source, _, _ = make(reply, T_LIVE)
         self.assertEqual(source.blocks()["conditions"]["status"], "stale")
+
+    def test_tempest_not_reporting_makes_lightning_late(self):
+        """Warnings audit (2026-11-27): lightning comes from the Tempest, so with it silent
+        the lightning block is stale and its flags unknown, never "no lightning"."""
+        reply = copy.deepcopy(LIVE)
+        reply["tempest"]["available"] = False
+        source, _, _ = make(reply, T_LIVE)
+        l = source.blocks()["lightning"]
+        self.assertEqual(l["status"], "stale")
+        self.assertIn("Tempest", l["message"])
+        self.assertIsNone(l["within_10mi"])
+        self.assertIsNone(l["within_5mi"])
+
+    def test_hold_stands_while_sentinel_down(self):
+        """Warnings audit (2026-11-27): the console's own 5-mile hold and Sentinel's last
+        10-mile hold time stand while Sentinel isn't answering; nothing is concluded after."""
+        source, stand_in, clock = make(storm_reply(), T_STORM)
+        before = source.blocks()["lightning"]
+        self.assertTrue(before["within_5mi"])
+        stand_in.reply = urllib.error.URLError("down")
+        clock.now = T_STORM + timedelta(minutes=8)
+        l = source.blocks()["lightning"]
+        self.assertEqual(l["status"], "stale")
+        self.assertIs(l["within_5mi"], True)
+        self.assertEqual(l["hold_since_5mi"], before["hold_since_5mi"])
+        self.assertIsNone(l["frequent"])
+        clock.now = T_STORM + timedelta(hours=2)          # every hold has run out
+        l = source.blocks()["lightning"]
+        self.assertIsNone(l["within_5mi"])
+        self.assertIsNone(l["within_10mi"])
+
+    def test_hold_stands_after_restart_with_sentinel_down(self):
+        path = os.path.join(tempfile.mkdtemp(), "lightning.json")
+        source, _, _ = make(storm_reply(), T_STORM, state_path=path)
+        source.blocks()
+        later, _, _ = make(urllib.error.URLError("down"), T_STORM + timedelta(minutes=5), state_path=path)
+        l = later.blocks()["lightning"]
+        self.assertEqual(l["status"], "unavailable")
+        self.assertIs(l["within_5mi"], True)
 
     def test_missing_blocks_are_unknown_not_all_clear(self):
         source, _, _ = make({"simulation": False}, T_LIVE)

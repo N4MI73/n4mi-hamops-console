@@ -7,7 +7,7 @@ A portable Raspberry Pi 5 touchscreen operations console for amateur radio. It p
 
 Both modes are the same dashboard reading the same JSON from a small service on the Pi; only that service's data sources change.
 
-> **Status (November 2026): early development.** The hardware is built and the design is settled. What's here so far: the kiosk display setup, a touch test page, the example settings file, the console service (propagation relay, home weather relay, NWS forecast, alert ranking, the settings API and Pi status) and the dashboard's Home screen; the detail pages come next.
+> **Status (November 2026): release candidate in preparation.** Every screen is built and running on the real console: Home, Propagation, Weather (with the NOAA Weather Radio panel), Alerts, System, Settings (including Wi-Fi from the touchscreen and a Field Day timer) and Help. Field Mode is complete and self-contained: NWS alerts, forecast and nearest station; bands rated on the Pi; GOES satellite lightning; the grid from a USB GPS. Also: Sleep, day/night brightness and a red night style, panel cycling for a tent display, and an automatic mirror to an HDMI monitor. Version 0.9.0 follows a dry run away from home in January 2027; 1.0 is a successful Winter Field Day. The MUF map screen is deferred.
 
 ## How it works
 
@@ -16,7 +16,8 @@ Home Mode:   home propagation monitor ─┐
              home weather server ──────┤
                                        ├─► console service (Python, systemd, on the Pi) ─► dashboard (Chromium kiosk)
 Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and caches each source, decides fresh/stale,
-             NWS api.weather.gov ──────┘        ranks alerts, reads the Pi's own status
+             NWS api.weather.gov ──────┤        ranks alerts, reads the Pi's own status
+             NOAA GOES lightning ──────┘
 ```
 
 - The **dashboard** is a local HTML/CSS/JavaScript page shown fullscreen by Chromium under the labwc Wayland compositor.
@@ -28,8 +29,8 @@ Field Mode:  HamQSL, NOAA SWPC ────────┤        fetches and ca
 
 | Folder | Contents |
 |---|---|
-| `server/` | The console service (Python + Flask). So far: propagation relay from PropMon, home weather relay from Weather Sentinel, the NWS forecast, the ranked alert list, the settings API, the Pi's own status, the shared freshness rule, alert classification, NWS alert text lines, and tests. See `server/README.md` |
-| `dashboard/` | The touchscreen web page: the Home screen so far, with its bundled fonts, and a service check page at `/check`. See `dashboard/README.md` |
+| `server/` | The console service (Python + Flask): the home relays (PropMon, Weather Sentinel), the Field Mode sources (NWS, the field propagation engine, GOES satellite lightning), GPS, Wi-Fi, the ranked alert list, the settings API, the Pi's own status and display control, the shared freshness rule, and tests. See `server/README.md` |
+| `dashboard/` | The touchscreen web pages (Home, Propagation, Weather, Alerts, System, Settings) with their bundled fonts, and a service check page at `/check`. See `dashboard/README.md` |
 | `pi/` | Files that set up the Raspberry Pi itself: the kiosk display (labwc + Chromium) and the service's systemd unit. See `pi/README.md` |
 | `config/` | `settings.example.json`, the template for the console's settings |
 | `diagnostics/` | Small standalone test tools: `kiosk-test.html` (screen rotation and touch), `glm_size_check.py` (GOES lightning data cost, listings only), `glm_replay.py` (replays a past storm's archived GOES lightning files through the console's own lightning code and prints what the Priority Card would have said) |
@@ -58,16 +59,8 @@ The console reads its settings from `~/.config/hamops-console/settings.json` on 
 
 ## Running the tests
 
-No network or Pi needed. The service, weather, forecast and alert tests need Flask (`sudo apt install python3-flask`, or `pip install flask` elsewhere); the Field Mode propagation tests need astral (`sudo apt install python3-astral`, or `pip install astral==3.2`). Every test file runs with `for t in server/tests/test_*.py; do python3 $t; done`:
+No network or Pi needed. The service, weather, forecast and alert tests need Flask (`sudo apt install python3-flask`, or `pip install flask` elsewhere); the Field Mode propagation tests need astral (`sudo apt install python3-astral`, or `pip install astral==3.2`). Run them all with `for t in server/tests/test_*.py; do python3 $t; done`, or `python3 -m unittest discover -s server/tests`. The GOES lightning file tests also need netCDF4 (`sudo apt install python3-netcdf4`) and are skipped without it.
 
-```
-python3 server/tests/test_nws_text.py
-python3 server/tests/test_service.py
-python3 server/tests/test_weather.py
-python3 server/tests/test_forecast.py
-python3 server/tests/test_alerts.py
-python3 server/tests/test_settings_api.py
-```
 
 ## Credits
 
@@ -75,7 +68,7 @@ python3 server/tests/test_settings_api.py
 
 `server/hamops_console/fieldengine/` is Ham Shack Automation's PropMon field engine from [n4mi-shack-server](https://github.com/N4MI73/n4mi-shack-server) (`field-engine/`, commit `4872101`), so Field Mode rates bands with the same model as PropMon at home; its README lists what was changed in this copy.
 
-Data sources: [NOAA/NWS](https://www.weather.gov) (alerts, forecasts, observations, NOAA Weather Radio listings), [NOAA SWPC](https://www.swpc.noaa.gov), [HamQSL](https://www.hamqsl.com), [KC2G](https://prop.kc2g.com).
+Data sources: [NOAA/NWS](https://www.weather.gov) (alerts, forecasts, observations, NOAA Weather Radio listings), [NOAA SWPC](https://www.swpc.noaa.gov), [NOAA GOES Geostationary Lightning Mapper](https://registry.opendata.aws/noaa-goes/) (Field Mode lightning), [HamQSL](https://www.hamqsl.com).
 
 ## License
 
